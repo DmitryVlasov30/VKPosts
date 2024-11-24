@@ -1,3 +1,5 @@
+from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf
+
 import vk_api.exceptions
 from vk_api import VkApi
 from telebot import TeleBot
@@ -9,8 +11,8 @@ from threading import Timer
 ACCESS_TOKEN_VK = 'YOUR VK TOKEN'
 TOKEN = 'YOUR TOKEN BOT'
 bot = TeleBot(token=TOKEN)
-general_admin = 'YOUR TG ID'
-admin_chat_id = [general_admin]
+GENERAL_ADMIN = 'YOUR TG ID'
+admin_chat_id = [GENERAL_ADMIN]
 flag_stop = False
 
 
@@ -37,11 +39,20 @@ try:
         except Exception as ex:
             if 'Chat not found' in str(ex):
                 flag_tg = False
-        if flag_tg and flag_vk:
-            return True
-
-        return False
-
+        ans = (flag_vk, flag_tg)
+        inf_text = ""
+        match ans:
+            case (True, False):
+                inf_text = "Группы ТГ не существует"
+            case (False, False):
+                inf_text = "Группы ВК и ТГ не существует"
+            case (False, True):
+                inf_text = "Группы ВК не существует"
+            case _:
+                inf_text = "-"
+        if inf_text != "-":
+            return inf_text
+        return ""
 
 
     def group_all_information(group_name, information=None):
@@ -61,94 +72,30 @@ try:
                 return response[0]
 
 
-    def clear_func(arr):
-        try:
-            for el in arr:
-                if len(el[1]) >= 15:
-                    el[1] = list(sorted(map(int, el[1])))
-                    el[1] = el[1][-10:]
-            inf = ''
-            for el in arr:
-                message_string = ''
-                for mess_id in el[1]:
-                    message_string += str(mess_id) + '/'
-                inf += f'{"{" + el[0][0] + "." + el[0][1] + "." + el[0][2] + "}"}{message_string}'
-                if inf == '':
-                    return
-                with open('message_id.txt', 'w') as file:
-                    file.write(inf.replace(' ', ''))
-                    file.close()
-        except Exception as ex:
-            print(ex)
-
-
-    def get_inf_message():
-        with open('message_id.txt', 'r') as file:
-            text = file.read()
-            file.close()
-
-        text = text.split('{')
-        for el in text:
-            if not el:
-                del text[text.index(el)]
-
-        arr = [[el.split('}')[0].split('.'), el.split('}')[1].split('/')] for el in text]
-
-        for el in arr:
-            if '' in el[1]:
-                del el[1][el[1].index('')]
-
-        return arr
-
-
     def add_inf_message(vk, tg):
         id_group = group_all_information(vk, 'id')
+
         if id_group is None:
             return False
-        with open('message_id.txt', 'a') as file:
-            file.seek(0, 2)
-            file.write(f"{'{' + vk + '.' + tg + '.' + id_group + '}'}")
-            file.close()
-
-
-    def del_message_id(vk, tg):
-        message_list = get_inf_message()
-        index = -1
-        flag_last_el = False
-        if len(message_list) == 1:
-            flag_last_el = True
-        for i, el in enumerate(message_list):
-            if el[0][0] == vk and el[0][1] == tg:
-                index = i
-
-        if index == -1:
-            return 'Не удалось удалить группу'
-
-        del message_list[index]
-
-        inf = ''
-        for el in message_list:
-            message_string = ''
-            for mess_id in el[1]:
-                message_string += mess_id + '/'
-            inf += f'{"{" + el[0][0] + "." + el[0][1] + "." + el[0][2] + "}"}{message_string}'
-        if inf == '' and not flag_last_el:
-            return
-        with open('message_id.txt', 'w') as file:
-            file.write(inf)
-            file.close()
-
+        inf = get_db_inf(name_col="vk_id tg_channel")
+        flag_exist = False
+        for el in inf:
+            if el[0] == int(id_group) and el[1] == tg:
+                flag_exist = True
+        if not flag_exist:
+            new_inf(vk_id=int(id_group), vk_screen=vk, tg_channel=tg)
+        return flag_exist
 
 
     def filter_photo(vk):
-        filter_list = ['maimoscow']
+        filter_list = []
         if vk in filter_list:
             return True
         return False
 
 
     def filter_add(text):
-        domen_link = ['.com', '.net', '.ru', '.рф', 'Ребята, сохраняйте контакты, помогут в учебе😉', 'club', 'Создали общую беседу для Вас (для всех курсов), там вы сможете знакомиться, задавать вопросы, искать задания и т.д.', 'впостер', '@tech_univers']
+        domen_link = []
         for el in domen_link:
             if el in text:
                 return False
@@ -191,13 +138,13 @@ try:
     @bot.message_handler(commands=["del_adm"])
     @ignoring_not_admin_message
     def del_adm(message):
-        global admin_chat_id, general_admin
+        global admin_chat_id, GENERAL_ADMIN
         try:
             admin = message.text[8:].strip()
             if admin.isdigit():
                 if admin in admin_chat_id:
                     index_del_adm = admin_chat_id.index(admin)
-                    if admin_chat_id[index_del_adm] == general_admin:
+                    if admin_chat_id[index_del_adm] == GENERAL_ADMIN:
                         bot.send_message(message.chat.id, 'Нельзя удалить главного админа')
                         return
                     del admin_chat_id[index_del_adm]
@@ -211,7 +158,7 @@ try:
                     chat = bot.get_chat(el)
                     if chat.username == admin:
                         index_admin = i
-                    if el == general_admin:
+                    if el == GENERAL_ADMIN:
                         bot.send_message(message.chat.id, 'Нельзя удалить главного админа')
                         return
                 if index_admin != -1:
@@ -234,17 +181,12 @@ try:
         bot.send_message(message.chat.id, inf, parse_mode='Markdown')
 
 
-    def post_information(groups_name, group_tg):
+    def post_information(group_id: int, group_tg: str):
         global ACCESS_TOKEN_VK
         vk = VkApi(token=ACCESS_TOKEN_VK)
         post_inf = []
-        all_message = get_inf_message()
-        all_inf = get_inf_message()
-        group_id = 0
-        group_inf = [[group[0], group[1], group[2]] for group, message in all_inf]
-        for vk_group, tg, vk_id in group_inf:
-            if vk_group == groups_name and tg == group_tg:
-                group_id = int(vk_id)
+        all_message = get_db_inf(name_col="vk_id tg_channel posts_id")
+        all_message = [[[vk_id, tg], posts.split()] for vk_id, tg, posts in all_message]
         try:
             response = vk.method('wall.get', {
                 'owner_id': -group_id,
@@ -259,19 +201,19 @@ try:
                     continue
                 id_post = []
                 for el in all_message:
-                    if el[0][0] == groups_name and el[0][1] == group_tg:
+                    if el[0][0] == group_id and el[0][1] == group_tg:
                         id_post = el[1]
                 if not str(post.get('id', '')) in list(map(str, id_post)):
                     for el in all_message:
-                        if el[0][0] == groups_name and el[0][1] == group_tg:
+                        if el[0][0] == group_id and el[0][1] == group_tg:
                             el[1].append(str(post.get('id')))
                     text_post = post.get('text', '')
                     list_size_photo = []
                     if 'attachments' in post:
-                       for attachments in post['attachments']:
+                        for attachments in post['attachments']:
                             if attachments['type'] == 'photo':
                                 for count, link in enumerate(attachments['photo']['sizes']):
-                                    if count == len(attachments['photo']['sizes'])-1:
+                                    if count == len(attachments['photo']['sizes']) - 1:
                                         list_size_photo.append(link['url'])
                     post_inf.append([text_post, list_size_photo])
 
@@ -279,25 +221,16 @@ try:
             print(ex)
             pass
 
-        inf = ''
-
         for el in all_message:
-            message_string = ''
             el[1] = sorted(map(int, el[1]))
-            for mess_id in map(str, el[1]):
-                message_string += mess_id + '/'
-            inf += f'{"{" + el[0][0] + "." + el[0][1] + "." + el[0][2] + "}"}{message_string}'
-        if inf == '':
-            return
-        with open('message_id.txt', 'w') as file:
-            file.write(inf)
-            file.close()
+            posts = " ".join(list(map(str, el[1])))
+            update_inf(el[0][0], el[0][1], posts)
 
         return list(reversed(post_inf))
 
 
     @bot.message_handler(commands=["start"])
-    def start(message):
+    def main(message):
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
                         'Используйте команду /help для вызова списка функций\n\n'
                         '<em><u><i>Сreated by Vlasov</i></u></em>\n'
@@ -305,6 +238,7 @@ try:
         bot.send_message(message.chat.id, text_message, parse_mode='html')
 
         start_timer(message)
+        create_main_table()
 
     if not flag_stop:
         def start_timer(message):
@@ -317,9 +251,7 @@ try:
     def add_vk_tg_group(message):
         chat = message.chat.id
         try:
-            all_inf = get_inf_message()
             vk, tg = message.text[4:].strip().split()
-
             if 'https://vk.com' in vk:
                 vk = vk.split('/')[-1]
 
@@ -328,22 +260,17 @@ try:
 
             if '@' in tg:
                 tg = tg.replace('@', '')
-
-            if not check_exist_groups(vk, tg):
-                bot.send_message(chat, 'Группы вк или тг не существует')
+            inf_exist = check_exist_groups(vk, tg)
+            if inf_exist != "-" and inf_exist != "":
+                bot.send_message(chat, inf_exist)
                 return
 
             vk = group_all_information(vk, 'screen_name')
+            text = add_inf_message(vk, tg)
 
-            flag_exists = False
-            for group, message in all_inf:
-                if group[0] == vk and group[1] == tg:
-                    flag_exists = True
-            if flag_exists:
-                bot.send_message(chat, 'Группа уже отслеживается')
+            if text:
+                bot.send_message(chat, 'Группa уже отслеживается')
                 return
-
-            add_inf_message(vk, tg)
             bot.send_message(chat, 'Группa отслеживается')
         except Exception as ex:
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции add_vk_tg_group')
@@ -354,7 +281,7 @@ try:
     def del_group(message):
         chat = message.chat.id
         try:
-            all_inf = get_inf_message()
+            all_inf = get_db_inf(name_col="vk_screen tg_channel")
 
             vk, tg = message.text[4:].strip().split()
 
@@ -368,15 +295,17 @@ try:
                 tg = tg.replace('@', '')
 
             flag_exists = False
-            for group, message in all_inf:
-                if group[0] == vk and group[1] == tg:
+            for vk_db, tg_db in all_inf:
+                if vk_db == vk and tg_db == tg:
                     flag_exists = True
             if not flag_exists:
                 bot.send_message(chat, 'Группа не найдена')
                 return
 
-            text_otv = del_message_id(vk, tg)
-            if not text_otv is None:
+            vk = group_all_information(vk, "id")
+            text_otv = delete_inf(vk, tg)
+
+            if text_otv != "":
                 bot.send_message(chat, text_otv)
                 return
             bot.send_message(chat, 'Группа удалена')
@@ -389,18 +318,18 @@ try:
             global admin_chat_id
 
             try:
-                all_inf = get_inf_message()
+                group_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
 
-                if len(all_inf) == 0:
+                if len(group_inf) == 0:
                     start_timer(message)
                     return
-                group_inf = [[group[0], group[1], group[2]] for group, message in all_inf]
+
                 for vk, tg, id_group_vk in group_inf:
 
-                    new_posts = post_information(vk, tg)
+                    new_posts = post_information(id_group_vk, tg)
                     if new_posts is None:
                         for admin in admin_chat_id:
-                            bot.send_message(admin, "данные потеряны :(")
+                            bot.send_message(admin, "функция post_information вернула None")
                         return
                     for text_post, photo_post in new_posts:
                         try:
@@ -436,7 +365,7 @@ try:
                 for el in admin_chat_id:
                     bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post')
             finally:
-                clear_func(get_inf_message())
+                clear_inf(20)
                 start_timer(message)
                 return
 
@@ -445,18 +374,14 @@ try:
     @bot.message_handler(commands=["group"])
     @ignoring_not_admin_message
     def get_group_list(message):
-        all_inf = get_inf_message()
-        group_inf = [[group[0], group[1], group[2]] for group, message in all_inf]
-        for el in group_inf:
-            if not el:
-                del group_inf[group_inf.index(el)]
+        all_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
 
-        if len(group_inf) == 0:
+        if len(all_inf) == 0:
             bot.send_message(message.chat.id, "У вас нет групп")
             return
 
         inf = 'Ваши группы:\n'
-        for vk, tg, id_vk in group_inf:
+        for vk, tg, id_vk in all_inf:
             vk_name = group_all_information(id_vk, 'screen_name')
             vk_link = f'https://vk.com/{vk_name}'
             inf += (f'*VK*: `{vk_name}`\n'
