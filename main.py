@@ -3,7 +3,7 @@ from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main
 import vk_api.exceptions
 from vk_api import VkApi
 from telebot import TeleBot
-from telebot.types import InputMediaPhoto
+from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 
 from threading import Timer
 
@@ -14,8 +14,6 @@ bot = TeleBot(token=TOKEN)
 GENERAL_ADMIN = 'YOUR TG ID'
 admin_chat_id = [GENERAL_ADMIN]
 flag_stop = False
-
-
 
 
 try:
@@ -112,6 +110,22 @@ try:
             function = func(message)
             return function
         return wrapper
+
+
+    @bot.message_handler(commands=["adv"])
+    @ignoring_not_admin_message
+    def adv_newsletter(message):
+        try:
+            vk_public = get_db_inf(name_col="tg_channel vk_screen")
+            markup = InlineKeyboardMarkup(row_width=1)
+            my_keyboard = []
+            for tg, vk in vk_public:
+                my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk}"))
+            markup.add(*my_keyboard)
+            message_text = "Ваше сообщение будет сохранено\nВыберите каналы, в которые должна пойти рассылка"
+            bot.send_message(message.chat.id, message_text, reply_markup=markup)
+        except Exception as ex:
+            bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
 
 
     @bot.message_handler(commands=["new_adm"])
@@ -245,7 +259,6 @@ try:
             Timer(180, message_post, args=(message,)).start()
 
 
-
     @bot.message_handler(commands=["add"])
     @ignoring_not_admin_message
     def add_vk_tg_group(message):
@@ -368,7 +381,6 @@ try:
                 clear_inf(20)
                 start_timer(message)
                 return
-
 
 
     @bot.message_handler(commands=["group"])

@@ -1,7 +1,7 @@
 from sqlite3 import connect
 from pathlib import Path
 
-path = Path("/home/diwex43/bot/my_main_db.db")
+path = Path("YOUR PATH")
 
 name_tbl = "posts_table"
 
