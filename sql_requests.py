@@ -1,7 +1,7 @@
 from sqlite3 import connect
 from pathlib import Path
 
-path = Path("YOUR PATH")
+path = Path("/home/diwex43/bot/my_main_db.db")
 
 name_tbl = "posts_table"
 
@@ -38,16 +38,22 @@ def clear_inf(count_posts: int, name_table=name_tbl) -> list:
         posts = curr.fetchall()
         #print(posts)
         for element in map(lambda x: list(x), posts):
-            #print(element)
-            element[2] = element[2].split()[-count_posts:]
+            arr = element[2].split()
+            if len(arr) >= count_posts:
+                #print(arr)
+                arr = list(sorted(arr, key=lambda x: int(x)))
+                arr = arr[-count_posts:]
+            else:
+                continue
 
-            count = len(element[2])
-            element[2] = " ".join(element[2])
+            count = len(arr)
+            element[2] = " ".join(arr)
+            #print(element[2])
             #print(element[2])
             element[3] = count
             curr.execute(f"""
-                UPDATE posts SET posts_id = ?, quantity = ?
-                WHERE (vk_id = ?) AND (tg_channel = ?)                                                        
+                UPDATE {name_tbl} SET posts_id = ?, quantity = ?
+                WHERE (vk_id = ?) AND (tg_channel = ?)
             """, (element[2], element[3], str(element[0]), str(element[1])))
         return posts
     except Exception as ex:
@@ -58,6 +64,7 @@ def clear_inf(count_posts: int, name_table=name_tbl) -> list:
 
 
 
+
 def new_inf(vk_id: int, vk_screen: str, tg_channel: str, posts="", name_table=name_tbl):
     global path
     db = connect(path)
@@ -65,8 +72,8 @@ def new_inf(vk_id: int, vk_screen: str, tg_channel: str, posts="", name_table=na
     try:
         curr = db.cursor()
         curr.execute(f"""
-                INSERT INTO {name_table} (vk_id, vk_screen, tg_channel, posts_id, quantity) VALUES 
-                    (?, ?, ?, ?, ?) 
+                INSERT INTO {name_table} (vk_id, vk_screen, tg_channel, posts_id, quantity) VALUES
+                    (?, ?, ?, ?, ?)
             """, (vk_id, vk_screen, tg_channel, posts, quantity))
     except Exception as ex:
         return ex
@@ -82,7 +89,7 @@ def delete_inf(vk_id: int, tg_channel: str, name_table=name_tbl):
     try:
         curr = db.cursor()
         curr.execute(f"""
-            DELETE FROM {name_table} 
+            DELETE FROM {name_table}
             WHERE (tg_channel = ?) AND (vk_id = ?)
         """, (tg_channel, vk_id))
     except Exception as ex:
@@ -107,7 +114,7 @@ def get_db_inf(name_col="*", rule=" ", name_table=name_tbl):
         curr = db.cursor()
         curr.execute(f"""
             SELECT {name_col}
-            FROM {name_table}  
+            FROM {name_table}
             {rule}
         """)
         all_ready_inf = curr.fetchall()
