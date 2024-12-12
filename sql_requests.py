@@ -1,9 +1,13 @@
 from sqlite3 import connect
 from pathlib import Path
+from json import load
 
-path = Path("YOUR PATH")
 
-name_tbl = "posts_table"
+with open("data.json") as data:
+    inf = load(data)
+    path = Path(inf["path_to_db"])
+    name_tbl = inf["name_table"]
+
 
 def create_main_table(name_db=name_tbl):
     global path

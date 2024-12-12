@@ -4,17 +4,22 @@ import vk_api.exceptions
 from vk_api import VkApi
 from telebot import TeleBot
 from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
+from json import load
+from traceback import format_exc
 
 from threading import Timer
 
+with open("data.json") as data:
+    inf = load(data)
+    ACCESS_TOKEN_VK = inf["access_token_vk"]
+    TOKEN = inf["token"]
+    GENERAL_ADMIN = inf["general_admin"]
 
-ACCESS_TOKEN_VK = 'YOUR VK TOKEN'
-TOKEN = 'YOUR TOKEN BOT'
 bot = TeleBot(token=TOKEN)
-GENERAL_ADMIN = 'YOUR TG ID'
 admin_chat_id = [GENERAL_ADMIN]
 flag_stop = False
-
+my_keyboard = []
+my_group_for_keyboard = []
 
 try:
 
@@ -115,12 +120,17 @@ try:
     @bot.message_handler(commands=["adv"])
     @ignoring_not_admin_message
     def adv_newsletter(message):
+        global my_keyboard, my_group_for_keyboard
+
         try:
             vk_public = get_db_inf(name_col="tg_channel vk_screen")
             markup = InlineKeyboardMarkup(row_width=1)
             my_keyboard = []
+            my_group_for_keyboard = []
             for tg, vk in vk_public:
-                my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk}"))
+                my_group_for_keyboard.append([vk, tg])
+                my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk} add"))
+            my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
             message_text = "Ваше сообщение будет сохранено\nВыберите каналы, в которые должна пойти рассылка"
             bot.send_message(message.chat.id, message_text, reply_markup=markup)
@@ -431,8 +441,73 @@ try:
         flag_stop = True
         bot.stop_bot()
 
+
+    def add_submit(call):
+        global my_keyboard, my_group_for_keyboard
+
+        call_data = call.data.split()
+        vk, tg, action = call_data[0], call_data[1], call_data[2]
+        print(vk, tg)
+        new_marcup = InlineKeyboardMarkup(row_width=1)
+        print(my_group_for_keyboard)
+        for i, el in enumerate(my_group_for_keyboard):
+            #print(el)
+            print(el[-1], tg, "<--tg")
+            print(el[-2], vk, "-_-->vk")
+            if el[-2] == tg and el[-1] == vk:
+                print(2)
+                my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg} {vk}", callback_data=f"{tg} {vk} not")
+                #print(2)
+        new_marcup.add(*my_keyboard)
+        print(new_marcup)
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=new_marcup
+        )
+
+
+
+    def del_submit(call):
+        global my_keyboard, my_group_for_keyboard
+
+        print("----")
+        call_data = call.data.split()
+        vk, tg, action = call_data[0], call_data[1], call_data[2]
+        print(vk, tg)
+        new_marcup = InlineKeyboardMarkup(row_width=1)
+        print(my_group_for_keyboard)
+        for i, el in enumerate(my_group_for_keyboard):
+            # print(el)
+            print(el[-1], tg, "<--tg")
+            print(el[-2], vk, "-_-->vk")
+            if el[-1] == tg and el[-2] == vk:
+                print(2)
+                my_keyboard[i] = InlineKeyboardButton(text=f"{tg} {vk}", callback_data=f"{tg} {vk} add")
+                # print(2)
+        new_marcup.add(*my_keyboard)
+        print(new_marcup)
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=new_marcup
+        )
+
+
+    @bot.callback_query_handler(func=lambda call: True)
+    def callback(call):
+        print(call.data.split())
+        if call.data.split()[-1] == "add":
+            print(1)
+            add_submit(call)
+        if call.data.split()[-1] == "not":
+            del_submit(call)
+
+
+
 except Exception as all_mistake:
     print(all_mistake)
+    print(format_exc())
 
 
 print('bot worked')

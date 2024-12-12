@@ -1,5 +1,7 @@
 {
-  "access_token_vk": "YOUR VK TOKEN",
-  "token": "YOUR TOKEN BOT",
-  "general_admin": "YOUR TG ID"
+  "access_token_vk": "YOUR ACCESS TOKEN VK",
+  "token": "YOUR API TOKEN",
+  "general_admin": "YOUR CHAT ID",
+  "path_to_db": "YOUR PATH TABLE",
+  "name_table": "YOUR NAME TABLE"
 }
