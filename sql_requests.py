@@ -2,11 +2,11 @@ from sqlite3 import connect
 from pathlib import Path
 from json import load
 
-
 with open("data.json") as data:
     inf = load(data)
     path = Path(inf["path_to_db"])
     name_tbl = inf["name_table"]
+    name_tbl_adv = inf["name_table_adv"]
 
 
 def create_main_table(name_db=name_tbl):
@@ -152,3 +152,55 @@ def update_inf(vk_id: int, tg_channel: str, posts: str, name_table=name_tbl):
     return flag
 
 
+def create_adv_table(name_table_adv=name_tbl_adv):
+    global path
+
+    db = connect(path)
+    curr = db.cursor()
+    curr.execute(f"""
+        CREATE TABLE IF NOT EXISTS {name_table_adv} (
+            "id"	INTEGER NOT NULL UNIQUE,
+            "inf_adv"	TEXT NOT NULL,
+            "date_post"	TEXT NOT NULL,
+            "tg_vk_posting"	TEXT NOT NULL,
+            PRIMARY KEY("id" AUTOINCREMENT)
+        )
+    """)
+    db.commit()
+    db.close()
+
+
+def new_adv_inf(inf_adv: str, date_post: str, tg_vk_posting: str, name_table=name_tbl_adv):
+    global path
+
+    db = connect(path)
+    try:
+        curr = db.cursor()
+        curr.execute(f"""
+                 INSERT INTO {name_table} (inf_adv, date_post, tg_vk_posting) VALUES
+                     (?, ?, ?)
+             """, (inf_adv, date_post, tg_vk_posting))
+    except Exception as ex:
+        return ex
+    finally:
+        db.commit()
+        db.close()
+
+
+def delete_adv_inf(date_now: str, name_table=name_tbl_adv):
+    global path
+
+    db = connect(path)
+    text_mistake = ""
+    try:
+        curr = db.cursor()
+        curr.execute(f"""
+            DELETE FROM {name_table} 
+            WHERE (date_post <= ?)     
+        """, (date_now,))
+    except Exception as ex:
+        text_mistake = ex
+    finally:
+        db.commit()
+        db.close()
+    return text_mistake

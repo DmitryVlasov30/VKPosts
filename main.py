@@ -1,4 +1,5 @@
-from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf
+from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
+    delete_adv_inf, new_adv_inf
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -6,6 +7,8 @@ from telebot import TeleBot
 from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from json import load
 from traceback import format_exc
+from random import randint
+import datetime
 
 from threading import Timer
 
@@ -18,12 +21,18 @@ with open("data.json") as data:
 bot = TeleBot(token=TOKEN)
 admin_chat_id = [GENERAL_ADMIN]
 flag_stop = False
+
 my_keyboard = []
 my_group_for_keyboard = []
+status_buttons = {}
+inf_adv = ""
+text_adv = ""
+foto_adv = ""
+video_adv = ""
 
 try:
 
-    def check_exist_groups(vk, tg):
+    def check_exist_groups(vk, tg) -> str:
         global ACCESS_TOKEN_VK
 
         flag_vk = False
@@ -80,9 +89,9 @@ try:
 
         if id_group is None:
             return False
-        inf = get_db_inf(name_col="vk_id tg_channel")
+        inf_db = get_db_inf(name_col="vk_id tg_channel")
         flag_exist = False
-        for el in inf:
+        for el in inf_db:
             if el[0] == int(id_group) and el[1] == tg:
                 flag_exist = True
         if not flag_exist:
@@ -90,14 +99,14 @@ try:
         return flag_exist
 
 
-    def filter_photo(vk):
+    def filter_photo(vk) -> bool:
         filter_list = []
         if vk in filter_list:
             return True
         return False
 
 
-    def filter_add(text):
+    def filter_add(text) -> bool:
         domen_link = []
         for el in domen_link:
             if el in text:
@@ -119,17 +128,23 @@ try:
 
     @bot.message_handler(commands=["adv"])
     @ignoring_not_admin_message
-    def adv_newsletter(message):
-        global my_keyboard, my_group_for_keyboard
+    def adv_newsletter(message) -> None:
+        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, foto_adv, video_adv
 
         try:
             vk_public = get_db_inf(name_col="tg_channel vk_screen")
             markup = InlineKeyboardMarkup(row_width=1)
             my_keyboard = []
             my_group_for_keyboard = []
+            status_buttons = {}
+            text_adv = message.text[4:].strip()
+
+
             for tg, vk in vk_public:
+                status_buttons[f"{vk} {tg}"] = "add"
                 my_group_for_keyboard.append([vk, tg])
                 my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk} add"))
+
             my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
             message_text = "Ваше сообщение будет сохранено\nВыберите каналы, в которые должна пойти рассылка"
@@ -140,7 +155,7 @@ try:
 
     @bot.message_handler(commands=["new_adm"])
     @ignoring_not_admin_message
-    def new_adm(message):
+    def new_adm(message) -> None:
         global admin_chat_id
         try:
             admin_id = message.text[8:].strip()
@@ -161,7 +176,7 @@ try:
 
     @bot.message_handler(commands=["del_adm"])
     @ignoring_not_admin_message
-    def del_adm(message):
+    def del_adm(message) -> None:
         global admin_chat_id, GENERAL_ADMIN
         try:
             admin = message.text[8:].strip()
@@ -195,14 +210,14 @@ try:
 
     @bot.message_handler(commands=["list_adm"])
     @ignoring_not_admin_message
-    def adm_list(message):
+    def adm_list(message) -> None:
         global admin_chat_id
-        inf = ''
+        inf_user = ''
         for el in admin_chat_id:
             chat = bot.get_chat(int(el))
             username = chat.username
-            inf += f'id: `{el}`, username: `@{username}`\n'
-        bot.send_message(message.chat.id, inf, parse_mode='Markdown')
+            inf_user += f'id: `{el}`, username: `@{username}`\n'
+        bot.send_message(message.chat.id, inf_user, parse_mode='Markdown')
 
 
     def post_information(group_id: int, group_tg: str):
@@ -254,7 +269,7 @@ try:
 
 
     @bot.message_handler(commands=["start"])
-    def main(message):
+    def main(message) -> None:
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
                         'Используйте команду /help для вызова списка функций\n\n'
                         '<em><u><i>Сreated by Vlasov</i></u></em>\n'
@@ -271,7 +286,7 @@ try:
 
     @bot.message_handler(commands=["add"])
     @ignoring_not_admin_message
-    def add_vk_tg_group(message):
+    def add_vk_tg_group(message) -> None:
         chat = message.chat.id
         try:
             vk, tg = message.text[4:].strip().split()
@@ -301,7 +316,7 @@ try:
 
     @bot.message_handler(commands=['del'])
     @ignoring_not_admin_message
-    def del_group(message):
+    def del_group(message) -> None:
         chat = message.chat.id
         try:
             all_inf = get_db_inf(name_col="vk_screen tg_channel")
@@ -395,26 +410,26 @@ try:
 
     @bot.message_handler(commands=["group"])
     @ignoring_not_admin_message
-    def get_group_list(message):
+    def get_group_list(message) -> None:
         all_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
 
         if len(all_inf) == 0:
             bot.send_message(message.chat.id, "У вас нет групп")
             return
 
-        inf = 'Ваши группы:\n'
+        inf_group = 'Ваши группы:\n'
         for vk, tg, id_vk in all_inf:
             vk_name = group_all_information(id_vk, 'screen_name')
             vk_link = f'https://vk.com/{vk_name}'
-            inf += (f'*VK*: `{vk_name}`\n'
+            inf_group += (f'*VK*: `{vk_name}`\n'
                     f'*TG*: `{tg}`\n'
                     f'*[LINK]({vk_link})*\n\n')
-        bot.send_message(message.chat.id, inf, parse_mode='MarkdownV2', disable_web_page_preview=True)
+        bot.send_message(message.chat.id, inf_group, parse_mode='MarkdownV2', disable_web_page_preview=True)
 
 
     @bot.message_handler(commands=['help'])
     @ignoring_not_admin_message
-    def help_func(message):
+    def help_func(message) -> None:
         message_text = ('/start -> перезапускает интервал проверки постов из ВК и выводит начальную информацию\n'
                         '/add("ссылка на паблик в вк" "username вашего тг канала") -> добавляет канал и тг для пересылки постов\n'
                         '/del("название из ссылки на паблик в вк" "username вашего тг канала") -> удалит канал и тг для пересылки постов\n'
@@ -428,13 +443,13 @@ try:
 
 
     @bot.message_handler(commands=["my_id"])
-    def my_id(message):
+    def my_id(message) -> None:
         bot.send_message(message.chat.id, f'Ваш id: `{str(message.chat.id)}`', parse_mode='Markdown')
 
 
     @bot.message_handler(commands=["stop"])
     @ignoring_not_admin_message
-    def stop_bot(message):
+    def stop_bot(message) -> None:
         global admin_chat_id, flag_stop
         for el in admin_chat_id:
             bot.send_message(el, 'Работа бота завершена')
@@ -442,7 +457,7 @@ try:
         bot.stop_bot()
 
 
-    def add_submit(call):
+    def add_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
         call_data = call.data.split()
@@ -456,6 +471,7 @@ try:
             print(el[-2], vk, "-_-->vk")
             if el[-2] == tg and el[-1] == vk:
                 print(2)
+                status_buttons[f"{el[0]} {el[1]}"] = "not"
                 my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg} {vk}", callback_data=f"{tg} {vk} not")
                 #print(2)
         new_marcup.add(*my_keyboard)
@@ -467,8 +483,7 @@ try:
         )
 
 
-
-    def del_submit(call):
+    def del_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
         print("----")
@@ -483,6 +498,7 @@ try:
             print(el[-2], vk, "-_-->vk")
             if el[-1] == tg and el[-2] == vk:
                 print(2)
+                status_buttons[f"{el[0]} {el[1]}"] = "add"
                 my_keyboard[i] = InlineKeyboardButton(text=f"{tg} {vk}", callback_data=f"{tg} {vk} add")
                 # print(2)
         new_marcup.add(*my_keyboard)
@@ -494,14 +510,33 @@ try:
         )
 
 
+    def save_submit(call):
+        global my_keyboard, my_group_for_keyboard, inf_adv
+
+        create_adv_table()
+        id_adv = randint(1000, 9999)
+        data_create = datetime.date.today()
+        for el in my_group_for_keyboard:
+            if status_buttons[f"{el[0]} {el[1]}"] == "not":
+                inf_adv = f"{id_adv}/{data_create}"
+                #new_adv_inf(inf_adv, )
+
+        return
+
+
+
     @bot.callback_query_handler(func=lambda call: True)
     def callback(call):
         print(call.data.split())
-        if call.data.split()[-1] == "add":
-            print(1)
-            add_submit(call)
-        if call.data.split()[-1] == "not":
-            del_submit(call)
+        match call.data.split()[-1]:
+            case "add":
+                print(1)
+                add_submit(call)
+            case "not":
+                del_submit(call)
+            case "end":
+                save_submit(call)
+
 
 
 
