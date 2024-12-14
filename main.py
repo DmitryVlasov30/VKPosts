@@ -4,11 +4,10 @@ from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main
 import vk_api.exceptions
 from vk_api import VkApi
 from telebot import TeleBot
-from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaVideo
 from json import load
 from traceback import format_exc
-from random import randint
-import datetime
+from datetime import datetime
 from threading import Timer
 
 
@@ -27,9 +26,10 @@ my_group_for_keyboard = []
 status_buttons = {}
 inf_adv = ""
 text_adv = ""
-foto_adv = ""
-video_adv = ""
+photo_adv = set()
+video_adv = set()
 date_adv = ""
+message_id_adv = ""
 
 try:
 
@@ -485,17 +485,17 @@ try:
 
 
     def save_submit(call):
-        global my_keyboard, my_group_for_keyboard, inf_adv
+        global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons
 
-        create_adv_table()
-        id_adv = randint(1000, 9999)
-        data_create = datetime.date.today()
-        for el in my_group_for_keyboard:
-            if status_buttons[f"{el[0]} {el[1]}"] == "not":
-                inf_adv = f"{id_adv}/{data_create}"
-                #new_adv_inf(inf_adv, )
+        list_group = ""
+        for vk, tg in my_group_for_keyboard:
+            if status_buttons[f"{vk} {tg}"] == "not":
+                list_group += f"{vk} {tg}/"
 
-        return
+        print(list_group)
+
+
+
 
 
 
@@ -512,23 +512,10 @@ try:
                 save_submit(call)
 
 
-    def inf_post_adv(message) -> tuple:
-        message_text = ""
-        print(message)
-        match message.content_type:
-            case "photo":
-                message_text = message.caption
-                if message_text[:4].strip() != "/adv":
-                    return ()
-            case "text":
-                message_text = message.text
-                if message_text[:4].strip() != "/adv":
-                    return ()
-            case "video":
-                message_text = message.caption
-                if message_text[:4].strip() != "/adv":
-                    return ()
-
+    def inf_post_adv(message):
+        message_text = message.text
+        if message_text is None or message_text[:4].strip() != "/adv":
+            return
         message_text = message_text[1:]
         idx_start = message_text.find("/") + 1
         idx_end = message_text[idx_start:].find("/") + idx_start
@@ -537,28 +524,115 @@ try:
         return date, text_adv_inf
 
 
+    @bot.message_handler(content_types=["video", "photo"])
+    def add_video_photo(message) -> None:
+        global video_adv, photo_adv, text_adv
+        match message.content_type:
+            case "video":
+                video_adv.add(message.video.file_id)
+            case "photo":
+                photo_adv.add(message.photo[-1].file_id)
 
 
+    def time_config(time, message) -> tuple:
+        try:
+            dt = datetime.strptime(time, "%H:%M %d.%m.%Y")
+            epoch = datetime(1, 1, 1)
+            date_now = datetime.now().strftime("%H:%M %d-%m-%Y")
+            dt_now = datetime.strptime(date_now, "%H:%M %d-%m-%Y")
+            seconds_since_now = int((dt_now - epoch).total_seconds())
+            seconds_since_epoch = int((dt - epoch).total_seconds())
+            #print(seconds_since_epoch - seconds_since_now)
+            #print(seconds_since_epoch, seconds_since_now)
+            return seconds_since_epoch - seconds_since_now, seconds_since_epoch
+        except:
+            bot.send_message(message.chat.id, "вы либо забыли указать время, либо не правильно его указали")
+            return 0, 0
 
-    @bot.message_handler(content_types=["video", "text", "photo"])
+
+    def send_adv_message_submit(message, chat_id):
+        global photo_adv, video_adv, text_adv
+
+        list_photo = []
+        list_video = []
+        media_all = []
+        if text_adv == "":
+            if len(photo_adv) >= 1:
+                list_photo = [InputMediaPhoto(media=photo_id) for photo_id in photo_adv]
+            if len(video_adv) >= 1:
+                list_video = [InputMediaVideo(media=video_id) for video_id in video_adv]
+
+            if len(list_video) > 1 or len(list_photo) > 1:
+                media_all.extend(list_video)
+                media_all.extend(list_photo)
+
+            if len(video_adv) + len(photo_adv) > 1:
+                bot.send_media_group(chat_id=chat_id, media=media_all)
+            else:
+                if len(photo_adv) == 1 and len(video_adv) == 0:
+                    list_photo = [el for el in photo_adv]
+                    bot.send_photo(chat_id=chat_id, photo=list_photo[0])
+                if len(video_adv) == 1 and len(photo_adv) == 0:
+                    list_video = [el for el in video_adv]
+                    bot.send_video(chat_id=chat_id, video=list_video[0])
+        else:
+            print(len(photo_adv))
+            if len(photo_adv) == 0 and len(video_adv) == 0:
+                bot.send_message(chat_id=chat_id, text=text_adv)
+            if len(video_adv) != 0 and len(photo_adv) != 0:
+                for i, el in enumerate(video_adv):
+                    if i == 0:
+                        list_video.append(InputMediaVideo(media=el, caption=text_adv))
+                        continue
+                    list_video.append(InputMediaVideo(media=el))
+                list_photo = [InputMediaPhoto(media=el) for el in photo_adv]
+            elif len(photo_adv) > 1 and len(video_adv) == 0:
+                for i, el in enumerate(photo_adv):
+                    if i == 0:
+                        list_photo.append(InputMediaPhoto(media=el, caption=text_adv))
+                        continue
+                    list_photo.append(InputMediaPhoto(media=el))
+            elif len(video_adv) > 1 and len(photo_adv) == 0:
+                for i, el in enumerate(video_adv):
+                    if i == 0:
+                        list_video.append(InputMediaVideo(media=el, caption=text_adv))
+                        continue
+                    list_video.append(InputMediaVideo(media=el))
+
+            if len(video_adv) + len(photo_adv) > 1:
+                media_all.extend(list_photo)
+                media_all.extend(list_video)
+                bot.send_media_group(chat_id=chat_id, media=media_all)
+            else:
+                if len(photo_adv) == 1 and len(video_adv) == 0:
+                    list_photo = [el for el in photo_adv]
+                    bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_adv)
+                if len(video_adv) == 1 and len(photo_adv) == 0:
+                    list_video = [el for el in video_adv]
+                    bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_adv)
+
+
+    @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
     def adv_newsletter(message) -> None:
-        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, foto_adv, video_adv, date_adv
-
+        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv
         date_adv_text = inf_post_adv(message)
+        print(1)
         if not date_adv_text:
-            bot.send_message(message.chat.id, "вы ввели что-то не так")
+             bot.send_message(message.chat.id, "вы ввели что-то не так")
+             return
+
+        time_range, date_adv = time_config(date_adv_text[0], message)
+        if (date_adv, time_range) == (0, 0):
             return
 
         try:
-
             vk_public = get_db_inf(name_col="tg_channel vk_screen")
             markup = InlineKeyboardMarkup(row_width=1)
             my_keyboard = []
             my_group_for_keyboard = []
             status_buttons = {}
-            text_adv = message.text[4:].strip()
-            date_adv, text_adv = date_adv_text
+            text_adv = date_adv_text[1]
 
             for tg, vk in vk_public:
                 status_buttons[f"{vk} {tg}"] = "add"
@@ -567,13 +641,17 @@ try:
 
             my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
-            message_text = "Ваше сообщение будет сохранено\nВыберите каналы, в которые должна пойти рассылка"
+            bot.send_message(message.chat.id, "вот ваше сообщение:")
+            send_adv_message_submit(message, message.chat.id)
+            message_text = "Выберите каналы, в которые должна пойти рассылка"
             bot.send_message(message.chat.id, message_text, reply_markup=markup)
+
+
         except Exception as ex:
             bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
 
-except Exception as all_mistake:
-    print(all_mistake)
+
+except:
     print(format_exc())
 
 
