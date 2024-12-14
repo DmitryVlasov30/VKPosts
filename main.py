@@ -9,8 +9,8 @@ from json import load
 from traceback import format_exc
 from random import randint
 import datetime
-
 from threading import Timer
+
 
 with open("data.json") as data:
     inf = load(data)
@@ -29,6 +29,7 @@ inf_adv = ""
 text_adv = ""
 foto_adv = ""
 video_adv = ""
+date_adv = ""
 
 try:
 
@@ -124,33 +125,6 @@ try:
             function = func(message)
             return function
         return wrapper
-
-
-    @bot.message_handler(commands=["adv"])
-    @ignoring_not_admin_message
-    def adv_newsletter(message) -> None:
-        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, foto_adv, video_adv
-
-        try:
-            vk_public = get_db_inf(name_col="tg_channel vk_screen")
-            markup = InlineKeyboardMarkup(row_width=1)
-            my_keyboard = []
-            my_group_for_keyboard = []
-            status_buttons = {}
-            text_adv = message.text[4:].strip()
-
-
-            for tg, vk in vk_public:
-                status_buttons[f"{vk} {tg}"] = "add"
-                my_group_for_keyboard.append([vk, tg])
-                my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk} add"))
-
-            my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
-            markup.add(*my_keyboard)
-            message_text = "Ваше сообщение будет сохранено\nВыберите каналы, в которые должна пойти рассылка"
-            bot.send_message(message.chat.id, message_text, reply_markup=markup)
-        except Exception as ex:
-            bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
 
 
     @bot.message_handler(commands=["new_adm"])
@@ -538,7 +512,65 @@ try:
                 save_submit(call)
 
 
+    def inf_post_adv(message) -> tuple:
+        message_text = ""
+        print(message)
+        match message.content_type:
+            case "photo":
+                message_text = message.caption
+                if message_text[:4].strip() != "/adv":
+                    return ()
+            case "text":
+                message_text = message.text
+                if message_text[:4].strip() != "/adv":
+                    return ()
+            case "video":
+                message_text = message.caption
+                if message_text[:4].strip() != "/adv":
+                    return ()
 
+        message_text = message_text[1:]
+        idx_start = message_text.find("/") + 1
+        idx_end = message_text[idx_start:].find("/") + idx_start
+        date = message_text[idx_start:idx_end]
+        text_adv_inf = message_text[idx_end+1:].strip()
+        return date, text_adv_inf
+
+
+
+
+
+    @bot.message_handler(content_types=["video", "text", "photo"])
+    @ignoring_not_admin_message
+    def adv_newsletter(message) -> None:
+        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, foto_adv, video_adv, date_adv
+
+        date_adv_text = inf_post_adv(message)
+        if not date_adv_text:
+            bot.send_message(message.chat.id, "вы ввели что-то не так")
+            return
+
+        try:
+
+            vk_public = get_db_inf(name_col="tg_channel vk_screen")
+            markup = InlineKeyboardMarkup(row_width=1)
+            my_keyboard = []
+            my_group_for_keyboard = []
+            status_buttons = {}
+            text_adv = message.text[4:].strip()
+            date_adv, text_adv = date_adv_text
+
+            for tg, vk in vk_public:
+                status_buttons[f"{vk} {tg}"] = "add"
+                my_group_for_keyboard.append([vk, tg])
+                my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk} add"))
+
+            my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
+            markup.add(*my_keyboard)
+            message_text = "Ваше сообщение будет сохранено\nВыберите каналы, в которые должна пойти рассылка"
+            bot.send_message(message.chat.id, message_text, reply_markup=markup)
+        except Exception as ex:
+            bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
 
 except Exception as all_mistake:
     print(all_mistake)
