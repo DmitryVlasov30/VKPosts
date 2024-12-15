@@ -1,3 +1,4 @@
+import sql_requests
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
     delete_adv_inf, new_adv_inf
 
@@ -429,6 +430,21 @@ try:
             bot.send_message(el, 'Работа бота завершена')
         flag_stop = True
         bot.stop_bot()
+        exit(0)
+
+
+    @bot.message_handler(commands=["my_adv"])
+    @ignoring_not_admin_message
+    def get_adv_inf(message):
+        all_inf = get_db_inf(name_table=sql_requests.name_tbl_adv)
+        for el in all_inf:
+            text = (f"ваша реклама:\n"
+                    f"текст рекламы: {el[1].split(" ")[0]}\n"
+                    f"Дата публикации: {datetime.fromtimestamp(int(el[2]) - int((datetime.strptime(datetime.now().strftime("%H:%M %d-%m-%Y"), "%H:%M %d-%m-%Y") - datetime(1, 1, 1)).total_seconds()))}\n"
+                    f"каналы куда пойдет рассылка:{el[3]}\n"
+                    f"{el[2]}\n")
+            bot.send_message(message.chat.id, text)
+
 
 
     def add_submit(call) -> None:
@@ -487,7 +503,7 @@ try:
     def save_submit(call):
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons
 
-        inf_adv = f"{text_adv}/{' '.join([el for el in photo_adv])}/{' '.join(el for el in video_adv)}"
+        inf_adv = f"{text_adv} {' '.join([el for el in photo_adv])} {' '.join(el for el in video_adv)}"
         if date_adv == 0:
             bot.send_message(call.message.chat_id, "что то не так с указанным временем")
             return
@@ -670,8 +686,6 @@ try:
         date_adv = ""
         message_id_adv = ""
         bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
-
-
 
 
 except:
