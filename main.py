@@ -487,15 +487,17 @@ try:
     def save_submit(call):
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons
 
+        inf_adv = f"{text_adv}/{' '.join([el for el in photo_adv])}/{' '.join(el for el in video_adv)}"
+        if date_adv == 0:
+            bot.send_message(call.message.chat_id, "что то не так с указанным временем")
+            return
+        photo_adv = set()
+        video_adv = set()
         list_group = ""
         for vk, tg in my_group_for_keyboard:
             if status_buttons[f"{vk} {tg}"] == "not":
                 list_group += f"{vk} {tg}/"
-
-        print(list_group)
-
-
-
+        new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
 
 
 
@@ -615,7 +617,7 @@ try:
     @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
     def adv_newsletter(message) -> None:
-        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv
+        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, photo_adv, video_adv
         date_adv_text = inf_post_adv(message)
         print(1)
         if not date_adv_text:
@@ -624,6 +626,9 @@ try:
 
         time_range, date_adv = time_config(date_adv_text[0], message)
         if (date_adv, time_range) == (0, 0):
+            date_adv = 0
+            photo_adv = set()
+            video_adv = set()
             return
 
         try:
@@ -649,6 +654,24 @@ try:
 
         except Exception as ex:
             bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
+
+
+    @bot.message_handler(commands=["reset"])
+    def reset_adv_inf(message):
+        global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
+                message_id_adv
+        my_keyboard = []
+        my_group_for_keyboard = []
+        status_buttons = {}
+        inf_adv = ""
+        text_adv = ""
+        photo_adv = set()
+        video_adv = set()
+        date_adv = ""
+        message_id_adv = ""
+        bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
+
+
 
 
 except:
