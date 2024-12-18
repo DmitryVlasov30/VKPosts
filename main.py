@@ -1,6 +1,6 @@
 import sql_requests
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
-    delete_adv_inf, new_adv_inf
+    delete_adv_inf, new_adv_inf, delete_all_inf
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -439,12 +439,34 @@ try:
         all_inf = get_db_inf(name_table=sql_requests.name_tbl_adv)
         for el in all_inf:
             text = (f"ваша реклама:\n"
-                    f"текст рекламы: {el[1].split(" ")[0]}\n"
-                    f"Дата публикации: {datetime.fromtimestamp(int(el[2]) - int((datetime.strptime(datetime.now().strftime("%H:%M %d-%m-%Y"), "%H:%M %d-%m-%Y") - datetime(1, 1, 1)).total_seconds()))}\n"
-                    f"каналы куда пойдет рассылка:{el[3]}\n"
-                    f"{el[2]}\n")
-            bot.send_message(message.chat.id, text)
+                    f"*id*: {el[0]}\n"
+                    f"*текст рекламы*: {el[1].split(" ")[0]}\n"
+                    f"*Дата публикации*: {el[2]}\n"
+                    f"*каналы куда пойдет рассылка*:\n{'\n'.join(el[3].split("/"))}\n")
+            bot.send_message(message.chat.id, text, parse_mode='MarkdownV2')
 
+
+    @bot.message_handler(commands=["reset_all"])
+    @ignoring_not_admin_message
+    def reset_all_data(message):
+        delete_all_inf()
+        bot.send_message(message.chat.id, "реклама отчищена")
+
+
+    @bot.message_handler(commands=["reset_data"])
+    def reset_adv_inf(message):
+        global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
+                message_id_adv
+        my_keyboard = []
+        my_group_for_keyboard = []
+        status_buttons = {}
+        inf_adv = ""
+        text_adv = ""
+        photo_adv = set()
+        video_adv = set()
+        date_adv = ""
+        message_id_adv = ""
+        bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
 
 
     def add_submit(call) -> None:
@@ -501,12 +523,9 @@ try:
 
 
     def save_submit(call):
-        global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons
+        global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons, date_adv
 
         inf_adv = f"{text_adv} {' '.join([el for el in photo_adv])} {' '.join(el for el in video_adv)}"
-        if date_adv == 0:
-            bot.send_message(call.message.chat_id, "что то не так с указанным временем")
-            return
         photo_adv = set()
         video_adv = set()
         list_group = ""
@@ -552,20 +571,29 @@ try:
                 photo_adv.add(message.photo[-1].file_id)
 
 
-    def time_config(time, message) -> tuple:
+    def time_difference(input_time):
         try:
-            dt = datetime.strptime(time, "%H:%M %d.%m.%Y")
-            epoch = datetime(1, 1, 1)
-            date_now = datetime.now().strftime("%H:%M %d-%m-%Y")
-            dt_now = datetime.strptime(date_now, "%H:%M %d-%m-%Y")
-            seconds_since_now = int((dt_now - epoch).total_seconds())
-            seconds_since_epoch = int((dt - epoch).total_seconds())
-            #print(seconds_since_epoch - seconds_since_now)
-            #print(seconds_since_epoch, seconds_since_now)
-            return seconds_since_epoch - seconds_since_now, seconds_since_epoch
-        except:
-            bot.send_message(message.chat.id, "вы либо забыли указать время, либо не правильно его указали")
-            return 0, 0
+            given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
+        except ValueError:
+            return "Неверный формат времени. Используйте 'часы:минуты день.месяц.год'."
+        current_time = datetime.now()
+        current_time, given_time = given_time, current_time
+        if current_time >= given_time:
+            difference = current_time - given_time
+
+            print(difference)
+            days = difference.days
+            hours, remainder = divmod(difference.seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
+            seconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60
+            return {
+                "days": days,
+                "hours": hours,
+                "minutes": minutes,
+                "seconds_diff": seconds,
+            }
+        else:
+            return -1
 
 
     def send_adv_message_submit(message, chat_id):
@@ -635,16 +663,20 @@ try:
     def adv_newsletter(message) -> None:
         global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, photo_adv, video_adv
         date_adv_text = inf_post_adv(message)
-        print(1)
         if not date_adv_text:
              bot.send_message(message.chat.id, "вы ввели что-то не так")
              return
 
-        time_range, date_adv = time_config(date_adv_text[0], message)
-        if (date_adv, time_range) == (0, 0):
-            date_adv = 0
-            photo_adv = set()
-            video_adv = set()
+        date = time_difference(date_adv_text[0])
+        date_adv = date_adv_text[0]
+        if not type(date) is dict:
+            reset_adv_inf(message)
+            text = ""
+            if type(date) is int:
+                text = "вы ввели дату, которая меньше нынешней"
+            if type(date) is str:
+                text = date
+            bot.send_message(message.chat.id, text)
             return
 
         try:
@@ -670,22 +702,6 @@ try:
 
         except Exception as ex:
             bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
-
-
-    @bot.message_handler(commands=["reset"])
-    def reset_adv_inf(message):
-        global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
-                message_id_adv
-        my_keyboard = []
-        my_group_for_keyboard = []
-        status_buttons = {}
-        inf_adv = ""
-        text_adv = ""
-        photo_adv = set()
-        video_adv = set()
-        date_adv = ""
-        message_id_adv = ""
-        bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
 
 
 except:
