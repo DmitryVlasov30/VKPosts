@@ -204,3 +204,19 @@ def delete_adv_inf(date_now: str, name_table=name_tbl_adv):
         db.commit()
         db.close()
     return text_mistake
+
+
+def delete_all_inf(name_table=name_tbl_adv):
+    global path
+
+    db = connect(path)
+    text_mistake = ""
+    try:
+        curr = db.cursor()
+        curr.execute(F"""DELETE FROM {name_table}""")
+    except Exception as ex:
+        text_mistake = ex
+    finally:
+        db.commit()
+        db.close()
+    return text_mistake
