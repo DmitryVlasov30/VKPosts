@@ -537,7 +537,7 @@ try:
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
 
 
-    def del_time() -> list:
+    def del_adv() -> list:
         all_adv = get_db_inf(name_table=name_tbl_adv)
         ready_adv = []
         for el in all_adv:
@@ -545,6 +545,13 @@ try:
                 ready_adv.append(el)
                 delete_adv_inf(el[0])
         return ready_adv
+
+
+    def send_adv_posts(adv_lst: list) -> None:
+        list_channel = get_db_inf(name_col="vk_screen tg_screen")
+        for adv in adv_lst:
+            pass
+            
 
 
     @bot.callback_query_handler(func=lambda call: True)
