@@ -379,6 +379,8 @@ try:
                     bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post')
             finally:
                 clear_inf(20)
+                ready_adv = del_adv()
+
                 start_timer(message)
                 return
 
@@ -535,8 +537,14 @@ try:
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
 
 
-    def check_time():
-        pass
+    def del_time() -> list:
+        all_adv = get_db_inf(name_table=name_tbl_adv)
+        ready_adv = []
+        for el in all_adv:
+            if time_difference(el[2]) == -1:
+                ready_adv.append(el)
+                delete_adv_inf(el[0])
+        return ready_adv
 
 
     @bot.callback_query_handler(func=lambda call: True)
