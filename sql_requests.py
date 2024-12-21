@@ -187,7 +187,7 @@ def new_adv_inf(inf_adv: str, date_post: str, tg_vk_posting: str, name_table=nam
         db.close()
 
 
-def delete_adv_inf(date_now: str, name_table=name_tbl_adv):
+def delete_adv_inf(id_del: int, name_table=name_tbl_adv):
     global path
 
     db = connect(path)
@@ -196,8 +196,8 @@ def delete_adv_inf(date_now: str, name_table=name_tbl_adv):
         curr = db.cursor()
         curr.execute(f"""
             DELETE FROM {name_table} 
-            WHERE (date_post <= ?)     
-        """, (date_now,))
+            WHERE (id = ?)     
+        """, (id_del,))
     except Exception as ex:
         text_mistake = ex
     finally:
