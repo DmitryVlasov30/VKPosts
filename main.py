@@ -1,6 +1,5 @@
-import sql_requests
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
-    delete_adv_inf, new_adv_inf, delete_all_inf
+    delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -253,6 +252,7 @@ try:
 
         start_timer(message)
         create_main_table()
+        create_adv_table()
 
     if not flag_stop:
         def start_timer(message):
@@ -436,14 +436,14 @@ try:
     @bot.message_handler(commands=["my_adv"])
     @ignoring_not_admin_message
     def get_adv_inf(message):
-        all_inf = get_db_inf(name_table=sql_requests.name_tbl_adv)
+        all_inf = get_db_inf(name_table=name_tbl_adv)
         for el in all_inf:
             text = (f"ваша реклама:\n"
-                    f"*id*: {el[0]}\n"
-                    f"*текст рекламы*: {el[1].split(" ")[0]}\n"
-                    f"*Дата публикации*: {el[2]}\n"
-                    f"*каналы куда пойдет рассылка*:\n{'\n'.join(el[3].split("/"))}\n")
-            bot.send_message(message.chat.id, text, parse_mode='MarkdownV2')
+                    f"<b>id</b>: {el[0]}\n"
+                    f"<b>текст рекламы</b>:  {el[1].split(" ")[0]}\n"
+                    f"<b>Дата публикации</b>:  {el[2]}\n"
+                    f"<b>каналы куда пойдет рассылка</b>: \n{'\n'.join(el[3].split("/"))}\n")
+            bot.send_message(message.chat.id, text, parse_mode='html')
 
 
     @bot.message_handler(commands=["reset_all"])
@@ -535,6 +535,9 @@ try:
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
 
 
+    def check_time():
+        pass
+
 
     @bot.callback_query_handler(func=lambda call: True)
     def callback(call):
@@ -596,66 +599,74 @@ try:
             return -1
 
 
-    def send_adv_message_submit(message, chat_id):
+    def send_adv_message_submit(message, chat_id, photo="", video="", text="", global_func=False):
         global photo_adv, video_adv, text_adv
 
+        if global_func:
+            photo_loc = photo_adv
+            video_loc = video_adv
+            text_loc = text_adv
+        else:
+            photo_loc = photo
+            video_loc = video
+            text_loc = text
         list_photo = []
         list_video = []
         media_all = []
-        if text_adv == "":
-            if len(photo_adv) >= 1:
-                list_photo = [InputMediaPhoto(media=photo_id) for photo_id in photo_adv]
-            if len(video_adv) >= 1:
-                list_video = [InputMediaVideo(media=video_id) for video_id in video_adv]
+        if text_loc == "":
+            if len(photo_loc) >= 1:
+                list_photo = [InputMediaPhoto(media=photo_id) for photo_id in photo_loc]
+            if len(video_loc) >= 1:
+                list_video = [InputMediaVideo(media=video_id) for video_id in video_loc]
 
             if len(list_video) > 1 or len(list_photo) > 1:
                 media_all.extend(list_video)
                 media_all.extend(list_photo)
 
-            if len(video_adv) + len(photo_adv) > 1:
+            if len(video_loc) + len(photo_loc) > 1:
                 bot.send_media_group(chat_id=chat_id, media=media_all)
             else:
-                if len(photo_adv) == 1 and len(video_adv) == 0:
-                    list_photo = [el for el in photo_adv]
+                if len(photo_loc) == 1 and len(video_loc) == 0:
+                    list_photo = [el for el in photo_loc]
                     bot.send_photo(chat_id=chat_id, photo=list_photo[0])
-                if len(video_adv) == 1 and len(photo_adv) == 0:
-                    list_video = [el for el in video_adv]
+                if len(video_loc) == 1 and len(photo_loc) == 0:
+                    list_video = [el for el in video_loc]
                     bot.send_video(chat_id=chat_id, video=list_video[0])
         else:
-            print(len(photo_adv))
-            if len(photo_adv) == 0 and len(video_adv) == 0:
-                bot.send_message(chat_id=chat_id, text=text_adv)
-            if len(video_adv) != 0 and len(photo_adv) != 0:
-                for i, el in enumerate(video_adv):
+            print(len(photo_loc))
+            if len(photo_loc) == 0 and len(video_loc) == 0:
+                bot.send_message(chat_id=chat_id, text=text_loc)
+            if len(video_loc) != 0 and len(photo_loc) != 0:
+                for i, el in enumerate(video_loc):
                     if i == 0:
-                        list_video.append(InputMediaVideo(media=el, caption=text_adv))
+                        list_video.append(InputMediaVideo(media=el, caption=text_loc))
                         continue
                     list_video.append(InputMediaVideo(media=el))
-                list_photo = [InputMediaPhoto(media=el) for el in photo_adv]
-            elif len(photo_adv) > 1 and len(video_adv) == 0:
-                for i, el in enumerate(photo_adv):
+                list_photo = [InputMediaPhoto(media=el) for el in photo_loc]
+            elif len(photo_loc) > 1 and len(video_loc) == 0:
+                for i, el in enumerate(photo_loc):
                     if i == 0:
-                        list_photo.append(InputMediaPhoto(media=el, caption=text_adv))
+                        list_photo.append(InputMediaPhoto(media=el, caption=text_loc))
                         continue
                     list_photo.append(InputMediaPhoto(media=el))
-            elif len(video_adv) > 1 and len(photo_adv) == 0:
-                for i, el in enumerate(video_adv):
+            elif len(video_loc) > 1 and len(photo_loc) == 0:
+                for i, el in enumerate(video_loc):
                     if i == 0:
-                        list_video.append(InputMediaVideo(media=el, caption=text_adv))
+                        list_video.append(InputMediaVideo(media=el, caption=text_loc))
                         continue
                     list_video.append(InputMediaVideo(media=el))
 
-            if len(video_adv) + len(photo_adv) > 1:
+            if len(video_loc) + len(photo_loc) > 1:
                 media_all.extend(list_photo)
                 media_all.extend(list_video)
                 bot.send_media_group(chat_id=chat_id, media=media_all)
             else:
-                if len(photo_adv) == 1 and len(video_adv) == 0:
-                    list_photo = [el for el in photo_adv]
-                    bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_adv)
-                if len(video_adv) == 1 and len(photo_adv) == 0:
-                    list_video = [el for el in video_adv]
-                    bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_adv)
+                if len(photo_loc) == 1 and len(photo_loc) == 0:
+                    list_photo = [el for el in photo_loc]
+                    bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc)
+                if len(video_loc) == 1 and len(photo_loc) == 0:
+                    list_video = [el for el in video_loc]
+                    bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_loc)
 
 
     @bot.message_handler(content_types=["text"])
