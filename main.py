@@ -10,7 +10,6 @@ from traceback import format_exc
 from datetime import datetime
 from threading import Timer
 
-
 with open("data.json") as data:
     inf = load(data)
     ACCESS_TOKEN_VK = inf["access_token_vk"]
@@ -124,6 +123,7 @@ try:
                 return
             function = func(message)
             return function
+
         return wrapper
 
 
@@ -143,7 +143,8 @@ try:
                 bot.send_message(message.chat.id, 'Вы добавили админа')
                 bot.send_message(admin_id, 'Вы админ')
             else:
-                bot.send_message(message.chat.id, 'В этой функции можно указать только chat id, человек, которого вы хотите добавить может узнать свой chat id командой /my_id')
+                bot.send_message(message.chat.id,
+                                 'В этой функции можно указать только chat id, человек, которого вы хотите добавить может узнать свой chat id командой /my_id')
         except Exception as ex:
             bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции new_adm')
 
@@ -253,6 +254,7 @@ try:
         start_timer(message)
         create_main_table()
         create_adv_table()
+
 
     if not flag_stop:
         def start_timer(message):
@@ -370,7 +372,9 @@ try:
                                 pass
                         except Exception as ex:
                             for el in admin_chat_id:
-                                 bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}')
+                                bot.send_message(el,
+                                    f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}'
+                                )
                             continue
 
 
@@ -378,7 +382,7 @@ try:
                 for el in admin_chat_id:
                     bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post')
             finally:
-                clear_inf(20)
+                clear_inf(15)
                 ready_adv = del_adv()
 
                 start_timer(message)
@@ -399,8 +403,8 @@ try:
             vk_name = group_all_information(id_vk, 'screen_name')
             vk_link = f'https://vk.com/{vk_name}'
             inf_group += (f'*VK*: `{vk_name}`\n'
-                    f'*TG*: `{tg}`\n'
-                    f'*[LINK]({vk_link})*\n\n')
+                          f'*TG*: `{tg}`\n'
+                          f'*[LINK]({vk_link})*\n\n')
         bot.send_message(message.chat.id, inf_group, parse_mode='MarkdownV2', disable_web_page_preview=True)
 
 
@@ -439,10 +443,23 @@ try:
     @ignoring_not_admin_message
     def get_adv_inf(message):
         all_inf = get_db_inf(name_table=name_tbl_adv)
+        if not len(all_inf):
+            bot.send_message(message.chat.id, "У вас нет рекламы")
+            return
+
         for el in all_inf:
-            text = (f"ваша реклама:\n"
+            print("---", el[1])
+            adv_text_inf, adv_photo_inf, adv_video_inf = el[1].split("/")
+            send_adv_message_submit(
+                message=message,
+                chat_id=message.chat.id,
+                video=adv_video_inf,
+                photo=adv_photo_inf,
+                text=adv_text_inf,
+                local_func=True
+            )
+            text = (f"информация о вашей рекламе:\n"
                     f"<b>id</b>: {el[0]}\n"
-                    f"<b>текст рекламы</b>:  {el[1].split(" ")[0]}\n"
                     f"<b>Дата публикации</b>:  {el[2]}\n"
                     f"<b>каналы куда пойдет рассылка</b>: \n{'\n'.join(el[3].split("/"))}\n")
             bot.send_message(message.chat.id, text, parse_mode='html')
@@ -456,9 +473,9 @@ try:
 
 
     @bot.message_handler(commands=["reset_data"])
-    def reset_adv_inf(message):
+    def reset_adv_inf(message, flag_message=True):
         global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
-                message_id_adv
+            message_id_adv
         my_keyboard = []
         my_group_for_keyboard = []
         status_buttons = {}
@@ -468,7 +485,8 @@ try:
         video_adv = set()
         date_adv = ""
         message_id_adv = ""
-        bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
+        if flag_message:
+            bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
 
 
     def add_submit(call) -> None:
@@ -476,20 +494,20 @@ try:
 
         call_data = call.data.split()
         vk, tg, action = call_data[0], call_data[1], call_data[2]
-        print(vk, tg)
+        #print(vk, tg)
         new_marcup = InlineKeyboardMarkup(row_width=1)
-        print(my_group_for_keyboard)
+        #print(my_group_for_keyboard)
         for i, el in enumerate(my_group_for_keyboard):
-            #print(el)
-            print(el[-1], tg, "<--tg")
-            print(el[-2], vk, "-_-->vk")
+            # print(el)
+            #print(el[-1], tg, "<--tg")
+            #print(el[-2], vk, "-_-->vk")
             if el[-2] == tg and el[-1] == vk:
-                print(2)
+                #print(2)
                 status_buttons[f"{el[0]} {el[1]}"] = "not"
                 my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg} {vk}", callback_data=f"{tg} {vk} not")
-                #print(2)
+                # print(2)
         new_marcup.add(*my_keyboard)
-        print(new_marcup)
+        #print(new_marcup)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -500,23 +518,23 @@ try:
     def del_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
-        print("----")
+        #print("----")
         call_data = call.data.split()
         vk, tg, action = call_data[0], call_data[1], call_data[2]
-        print(vk, tg)
+        #print(vk, tg)
         new_marcup = InlineKeyboardMarkup(row_width=1)
-        print(my_group_for_keyboard)
+        #print(my_group_for_keyboard)
         for i, el in enumerate(my_group_for_keyboard):
             # print(el)
-            print(el[-1], tg, "<--tg")
-            print(el[-2], vk, "-_-->vk")
+            #print(el[-1], tg, "<--tg")
+            #print(el[-2], vk, "-_-->vk")
             if el[-1] == tg and el[-2] == vk:
-                print(2)
+                #print(2)
                 status_buttons[f"{el[0]} {el[1]}"] = "add"
                 my_keyboard[i] = InlineKeyboardButton(text=f"{tg} {vk}", callback_data=f"{tg} {vk} add")
                 # print(2)
         new_marcup.add(*my_keyboard)
-        print(new_marcup)
+        #print(new_marcup)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -527,7 +545,9 @@ try:
     def save_submit(call):
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons, date_adv
 
-        inf_adv = f"{text_adv} {' '.join([el for el in photo_adv])} {' '.join(el for el in video_adv)}"
+        inf_adv = (f"{text_adv if text_adv else '-'}"
+                   f"/{' '.join([el for el in photo_adv]) if photo_adv else '-'}/"
+                   f"{' '.join(el for el in video_adv) if video_adv else '-'}")
         photo_adv = set()
         video_adv = set()
         list_group = ""
@@ -535,6 +555,8 @@ try:
             if status_buttons[f"{vk} {tg}"] == "not":
                 list_group += f"{vk} {tg}/"
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
+        bot.send_message(call.message.chat.id, "реклама сохраненна")
+        return
 
 
     def del_adv() -> list:
@@ -551,15 +573,12 @@ try:
         list_channel = get_db_inf(name_col="vk_screen tg_screen")
         for adv in adv_lst:
             pass
-            
 
 
     @bot.callback_query_handler(func=lambda call: True)
     def callback(call):
-        print(call.data.split())
         match call.data.split()[-1]:
             case "add":
-                print(1)
                 add_submit(call)
             case "not":
                 del_submit(call)
@@ -575,7 +594,7 @@ try:
         idx_start = message_text.find("/") + 1
         idx_end = message_text[idx_start:].find("/") + idx_start
         date = message_text[idx_start:idx_end]
-        text_adv_inf = message_text[idx_end+1:].strip()
+        text_adv_inf = message_text[idx_end + 1:].strip()
         return date, text_adv_inf
 
 
@@ -614,17 +633,17 @@ try:
             return -1
 
 
-    def send_adv_message_submit(message, chat_id, photo="", video="", text="", global_func=False):
+    def send_adv_message_submit(message, chat_id, photo="-", video="-", text="-", local_func=False):
         global photo_adv, video_adv, text_adv
 
-        if global_func:
+        if not local_func:
             photo_loc = photo_adv
             video_loc = video_adv
             text_loc = text_adv
         else:
-            photo_loc = photo
-            video_loc = video
-            text_loc = text
+            photo_loc = photo.split() if photo != "-" else []
+            video_loc = video.split() if video != "-" else []
+            text_loc = text if text != "-" else ""
         list_photo = []
         list_video = []
         media_all = []
@@ -652,6 +671,7 @@ try:
             if len(photo_loc) == 0 and len(video_loc) == 0:
                 bot.send_message(chat_id=chat_id, text=text_loc)
             if len(video_loc) != 0 and len(photo_loc) != 0:
+                print(8)
                 for i, el in enumerate(video_loc):
                     if i == 0:
                         list_video.append(InputMediaVideo(media=el, caption=text_loc))
@@ -659,24 +679,28 @@ try:
                     list_video.append(InputMediaVideo(media=el))
                 list_photo = [InputMediaPhoto(media=el) for el in photo_loc]
             elif len(photo_loc) > 1 and len(video_loc) == 0:
+                print(9)
                 for i, el in enumerate(photo_loc):
                     if i == 0:
                         list_photo.append(InputMediaPhoto(media=el, caption=text_loc))
                         continue
                     list_photo.append(InputMediaPhoto(media=el))
             elif len(video_loc) > 1 and len(photo_loc) == 0:
+                print(10)
                 for i, el in enumerate(video_loc):
                     if i == 0:
                         list_video.append(InputMediaVideo(media=el, caption=text_loc))
                         continue
                     list_video.append(InputMediaVideo(media=el))
+            print(11)
 
             if len(video_loc) + len(photo_loc) > 1:
                 media_all.extend(list_photo)
                 media_all.extend(list_video)
                 bot.send_media_group(chat_id=chat_id, media=media_all)
             else:
-                if len(photo_loc) == 1 and len(photo_loc) == 0:
+                print(12)
+                if len(photo_loc) == 1 and len(video_loc) == 0:
                     list_photo = [el for el in photo_loc]
                     bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc)
                 if len(video_loc) == 1 and len(photo_loc) == 0:
@@ -690,13 +714,13 @@ try:
         global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, photo_adv, video_adv
         date_adv_text = inf_post_adv(message)
         if not date_adv_text:
-             bot.send_message(message.chat.id, "вы ввели что-то не так")
-             return
+            bot.send_message(message.chat.id, "вы ввели что-то не так")
+            return
 
         date = time_difference(date_adv_text[0])
         date_adv = date_adv_text[0]
         if not type(date) is dict:
-            reset_adv_inf(message)
+            reset_adv_inf(message, flag_message=False)
             text = ""
             if type(date) is int:
                 text = "вы ввели дату, которая меньше нынешней"
@@ -732,7 +756,6 @@ try:
 
 except:
     print(format_exc())
-
 
 print('bot worked')
 bot.infinity_polling(timeout=10, long_polling_timeout=150)
