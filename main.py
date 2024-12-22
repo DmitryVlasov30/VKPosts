@@ -384,7 +384,7 @@ try:
             finally:
                 clear_inf(15)
                 ready_adv = del_adv()
-
+                send_adv_posts(message, ready_adv)
                 start_timer(message)
                 return
 
@@ -569,10 +569,14 @@ try:
         return ready_adv
 
 
-    def send_adv_posts(adv_lst: list) -> None:
+    def send_adv_posts(message, adv_lst: list) -> None:
         list_channel = get_db_inf(name_col="vk_screen tg_screen")
         for adv in adv_lst:
-            pass
+            send_adv_message_submit(
+                message,
+                chat_id=f"@{adv[3].split()[0]}",
+                local_func=True
+            )
 
 
     @bot.callback_query_handler(func=lambda call: True)
