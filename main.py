@@ -258,7 +258,7 @@ try:
 
     if not flag_stop:
         def start_timer(message):
-            Timer(180, message_post, args=(message,)).start()
+            Timer(15, message_post, args=(message,)).start()
 
 
     @bot.message_handler(commands=["add"])
@@ -340,7 +340,6 @@ try:
                     return
 
                 for vk, tg, id_group_vk in group_inf:
-
                     new_posts = post_information(id_group_vk, tg)
                     if new_posts is None:
                         for admin in admin_chat_id:
@@ -384,6 +383,7 @@ try:
             finally:
                 clear_inf(15)
                 ready_adv = del_adv()
+                print(ready_adv)
                 send_adv_posts(message, ready_adv)
                 start_timer(message)
                 return
@@ -563,6 +563,7 @@ try:
         all_adv = get_db_inf(name_table=name_tbl_adv)
         ready_adv = []
         for el in all_adv:
+            print(time_difference(el[2]), "<-----------")
             if time_difference(el[2]) == -1:
                 ready_adv.append(el)
                 delete_adv_inf(el[0])
@@ -570,13 +571,22 @@ try:
 
 
     def send_adv_posts(message, adv_lst: list) -> None:
-        list_channel = get_db_inf(name_col="vk_screen tg_screen")
         for adv in adv_lst:
-            send_adv_message_submit(
-                message,
-                chat_id=f"@{adv[3].split()[0]}",
-                local_func=True
-            )
+            print(adv[3].split()[1][:-1])
+            print(adv)
+            adv_text_inf, adv_photo_inf, adv_video_inf = adv[1].split("/")
+            group_post_adv = [vk_tg.split()[1] for vk_tg in adv[3].split("/") if vk_tg != '']
+            for tg in group_post_adv:
+                print(tg)
+                send_adv_message_submit(
+                    message=message,
+                    chat_id=f"@{tg}",
+                    video=adv_video_inf,
+                    photo=adv_photo_inf,
+                    text=adv_text_inf,
+                    local_func=True
+                )
+
 
 
     @bot.callback_query_handler(func=lambda call: True)
@@ -639,7 +649,7 @@ try:
 
     def send_adv_message_submit(message, chat_id, photo="-", video="-", text="-", local_func=False):
         global photo_adv, video_adv, text_adv
-
+        print(1)
         if not local_func:
             photo_loc = photo_adv
             video_loc = video_adv
