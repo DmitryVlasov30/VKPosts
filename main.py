@@ -1,5 +1,6 @@
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
     delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv
+from filter_adv import filter_add, filter_photo
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -15,9 +16,10 @@ with open("data.json") as data:
     ACCESS_TOKEN_VK = inf["access_token_vk"]
     TOKEN = inf["token"]
     GENERAL_ADMIN = inf["general_admin"]
+    ADMIN_CHAT_ID = inf["moderators"]
 
 bot = TeleBot(token=TOKEN)
-admin_chat_id = [GENERAL_ADMIN]
+ADMIN_CHAT_ID.append(GENERAL_ADMIN)
 flag_stop = False
 
 my_keyboard = []
@@ -99,27 +101,10 @@ try:
         return flag_exist
 
 
-    def filter_photo(vk) -> bool:
-        filter_list = []
-        if vk in filter_list:
-            return True
-        return False
-
-
-    def filter_add(text) -> bool:
-        domen_link = []
-        for el in domen_link:
-            if el in text:
-                return False
-        if 'http://' in text or 'https://' in text or len(text) == 1 or 't.me/' in text:
-            return False
-        return True
-
-
     def ignoring_not_admin_message(func):
         def wrapper(message):
-            global admin_chat_id
-            if not str(message.chat.id) in admin_chat_id:
+            global ADMIN_CHAT_ID
+            if not str(message.chat.id) in ADMIN_CHAT_ID:
                 return
             function = func(message)
             return function
@@ -127,68 +112,12 @@ try:
         return wrapper
 
 
-    @bot.message_handler(commands=["new_adm"])
-    @ignoring_not_admin_message
-    def new_adm(message) -> None:
-        global admin_chat_id
-        try:
-            admin_id = message.text[8:].strip()
-            if admin_id.isdigit():
-                if admin_id in admin_chat_id:
-                    bot.send_message(message.chat.id, 'Админ уже добавлен')
-                    return
-                if admin_id.strip() == '':
-                    bot.send_message(message.chat.id, 'Неправильные входные данные')
-                admin_chat_id.append(str(admin_id))
-                bot.send_message(message.chat.id, 'Вы добавили админа')
-                bot.send_message(admin_id, 'Вы админ')
-            else:
-                bot.send_message(message.chat.id,
-                                 'В этой функции можно указать только chat id, человек, которого вы хотите добавить может узнать свой chat id командой /my_id')
-        except Exception as ex:
-            bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции new_adm')
-
-
-    @bot.message_handler(commands=["del_adm"])
-    @ignoring_not_admin_message
-    def del_adm(message) -> None:
-        global admin_chat_id, GENERAL_ADMIN
-        try:
-            admin = message.text[8:].strip()
-            if admin.isdigit():
-                if admin in admin_chat_id:
-                    index_del_adm = admin_chat_id.index(admin)
-                    if admin_chat_id[index_del_adm] == GENERAL_ADMIN:
-                        bot.send_message(message.chat.id, 'Нельзя удалить главного админа')
-                        return
-                    del admin_chat_id[index_del_adm]
-                    bot.send_message(message.chat.id, 'Вы удалили админа')
-                    bot.send_message(admin, 'Вы теперь не админ')
-                else:
-                    bot.send_message(message.chat.id, 'Админ не найден')
-            else:
-                index_admin = -1
-                for i, el in enumerate(admin_chat_id):
-                    chat = bot.get_chat(el)
-                    if chat.username == admin:
-                        index_admin = i
-                    if el == GENERAL_ADMIN:
-                        bot.send_message(message.chat.id, 'Нельзя удалить главного админа')
-                        return
-                if index_admin != -1:
-                    del admin_chat_id[index_admin]
-                else:
-                    bot.send_message(message.chat.id, 'Админ не найден')
-        except Exception as ex:
-            bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции del_adm')
-
-
     @bot.message_handler(commands=["list_adm"])
     @ignoring_not_admin_message
     def adm_list(message) -> None:
-        global admin_chat_id
+        global ADMIN_CHAT_ID
         inf_user = ''
-        for el in admin_chat_id:
+        for el in ADMIN_CHAT_ID:
             chat = bot.get_chat(int(el))
             username = chat.username
             inf_user += f'id: `{el}`, username: `@{username}`\n'
@@ -258,7 +187,9 @@ try:
 
     if not flag_stop:
         def start_timer(message):
-            Timer(15, message_post, args=(message,)).start()
+            with open("data.json") as file:
+                interval = load(file)["interval"]
+            Timer(interval, message_post, args=(message,)).start()
 
 
     @bot.message_handler(commands=["add"])
@@ -330,7 +261,7 @@ try:
 
     if not flag_stop:
         def message_post(message):
-            global admin_chat_id
+            global ADMIN_CHAT_ID
 
             try:
                 group_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
@@ -342,7 +273,7 @@ try:
                 for vk, tg, id_group_vk in group_inf:
                     new_posts = post_information(id_group_vk, tg)
                     if new_posts is None:
-                        for admin in admin_chat_id:
+                        for admin in ADMIN_CHAT_ID:
                             bot.send_message(admin, "функция post_information вернула None")
                         return
                     for text_post, photo_post in new_posts:
@@ -370,7 +301,7 @@ try:
                             elif len(photo_post) == 0 and text_post == '':
                                 pass
                         except Exception as ex:
-                            for el in admin_chat_id:
+                            for el in ADMIN_CHAT_ID:
                                 bot.send_message(el,
                                     f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}'
                                 )
@@ -378,13 +309,12 @@ try:
 
 
             except Exception as ex:
-                for el in admin_chat_id:
+                for el in ADMIN_CHAT_ID:
                     bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post')
             finally:
                 clear_inf(15)
                 ready_adv = del_adv()
-                print(ready_adv)
-                send_adv_posts(message, ready_adv)
+                send_adv_posts(ready_adv)
                 start_timer(message)
                 return
 
@@ -431,8 +361,8 @@ try:
     @bot.message_handler(commands=["stop"])
     @ignoring_not_admin_message
     def stop_bot(message) -> None:
-        global admin_chat_id, flag_stop
-        for el in admin_chat_id:
+        global ADMIN_CHAT_ID, flag_stop
+        for el in ADMIN_CHAT_ID:
             bot.send_message(el, 'Работа бота завершена')
         flag_stop = True
         bot.stop_bot()
@@ -448,10 +378,8 @@ try:
             return
 
         for el in all_inf:
-            print("---", el[1])
             adv_text_inf, adv_photo_inf, adv_video_inf = el[1].split("/")
             send_adv_message_submit(
-                message=message,
                 chat_id=message.chat.id,
                 video=adv_video_inf,
                 photo=adv_photo_inf,
@@ -472,7 +400,7 @@ try:
         bot.send_message(message.chat.id, "реклама отчищена")
 
 
-    @bot.message_handler(commands=["reset_data"])
+    @bot.message_handler(commands=["reset"])
     def reset_adv_inf(message, flag_message=True):
         global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
             message_id_adv
@@ -494,20 +422,12 @@ try:
 
         call_data = call.data.split()
         vk, tg, action = call_data[0], call_data[1], call_data[2]
-        #print(vk, tg)
         new_marcup = InlineKeyboardMarkup(row_width=1)
-        #print(my_group_for_keyboard)
         for i, el in enumerate(my_group_for_keyboard):
-            # print(el)
-            #print(el[-1], tg, "<--tg")
-            #print(el[-2], vk, "-_-->vk")
             if el[-2] == tg and el[-1] == vk:
-                #print(2)
                 status_buttons[f"{el[0]} {el[1]}"] = "not"
                 my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg} {vk}", callback_data=f"{tg} {vk} not")
-                # print(2)
         new_marcup.add(*my_keyboard)
-        #print(new_marcup)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -518,23 +438,14 @@ try:
     def del_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
-        #print("----")
         call_data = call.data.split()
         vk, tg, action = call_data[0], call_data[1], call_data[2]
-        #print(vk, tg)
         new_marcup = InlineKeyboardMarkup(row_width=1)
-        #print(my_group_for_keyboard)
         for i, el in enumerate(my_group_for_keyboard):
-            # print(el)
-            #print(el[-1], tg, "<--tg")
-            #print(el[-2], vk, "-_-->vk")
             if el[-1] == tg and el[-2] == vk:
-                #print(2)
                 status_buttons[f"{el[0]} {el[1]}"] = "add"
                 my_keyboard[i] = InlineKeyboardButton(text=f"{tg} {vk}", callback_data=f"{tg} {vk} add")
-                # print(2)
         new_marcup.add(*my_keyboard)
-        #print(new_marcup)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -563,23 +474,18 @@ try:
         all_adv = get_db_inf(name_table=name_tbl_adv)
         ready_adv = []
         for el in all_adv:
-            print(time_difference(el[2]), "<-----------")
             if time_difference(el[2]) == -1:
                 ready_adv.append(el)
                 delete_adv_inf(el[0])
         return ready_adv
 
 
-    def send_adv_posts(message, adv_lst: list) -> None:
+    def send_adv_posts(adv_lst: list) -> None:
         for adv in adv_lst:
-            print(adv[3].split()[1][:-1])
-            print(adv)
             adv_text_inf, adv_photo_inf, adv_video_inf = adv[1].split("/")
             group_post_adv = [vk_tg.split()[1] for vk_tg in adv[3].split("/") if vk_tg != '']
             for tg in group_post_adv:
-                print(tg)
                 send_adv_message_submit(
-                    message=message,
                     chat_id=f"@{tg}",
                     video=adv_video_inf,
                     photo=adv_photo_inf,
@@ -600,15 +506,16 @@ try:
                 save_submit(call)
 
 
-    def inf_post_adv(message):
+    def inf_post_adv(message) -> tuple:
         message_text = message.text
         if message_text is None or message_text[:4].strip() != "/adv":
-            return
+            return ()
         message_text = message_text[1:]
         idx_start = message_text.find("/") + 1
         idx_end = message_text[idx_start:].find("/") + idx_start
         date = message_text[idx_start:idx_end]
         text_adv_inf = message_text[idx_end + 1:].strip()
+
         return date, text_adv_inf
 
 
@@ -632,7 +539,6 @@ try:
         if current_time >= given_time:
             difference = current_time - given_time
 
-            print(difference)
             days = difference.days
             hours, remainder = divmod(difference.seconds, 3600)
             minutes, _ = divmod(remainder, 60)
@@ -647,9 +553,8 @@ try:
             return -1
 
 
-    def send_adv_message_submit(message, chat_id, photo="-", video="-", text="-", local_func=False):
+    def send_adv_message_submit(chat_id, photo="-", video="-", text="-", local_func=False):
         global photo_adv, video_adv, text_adv
-        print(1)
         if not local_func:
             photo_loc = photo_adv
             video_loc = video_adv
@@ -681,11 +586,9 @@ try:
                     list_video = [el for el in video_loc]
                     bot.send_video(chat_id=chat_id, video=list_video[0])
         else:
-            print(len(photo_loc))
             if len(photo_loc) == 0 and len(video_loc) == 0:
                 bot.send_message(chat_id=chat_id, text=text_loc)
             if len(video_loc) != 0 and len(photo_loc) != 0:
-                print(8)
                 for i, el in enumerate(video_loc):
                     if i == 0:
                         list_video.append(InputMediaVideo(media=el, caption=text_loc))
@@ -693,27 +596,23 @@ try:
                     list_video.append(InputMediaVideo(media=el))
                 list_photo = [InputMediaPhoto(media=el) for el in photo_loc]
             elif len(photo_loc) > 1 and len(video_loc) == 0:
-                print(9)
                 for i, el in enumerate(photo_loc):
                     if i == 0:
                         list_photo.append(InputMediaPhoto(media=el, caption=text_loc))
                         continue
                     list_photo.append(InputMediaPhoto(media=el))
             elif len(video_loc) > 1 and len(photo_loc) == 0:
-                print(10)
                 for i, el in enumerate(video_loc):
                     if i == 0:
                         list_video.append(InputMediaVideo(media=el, caption=text_loc))
                         continue
                     list_video.append(InputMediaVideo(media=el))
-            print(11)
 
             if len(video_loc) + len(photo_loc) > 1:
                 media_all.extend(list_photo)
                 media_all.extend(list_video)
                 bot.send_media_group(chat_id=chat_id, media=media_all)
             else:
-                print(12)
                 if len(photo_loc) == 1 and len(video_loc) == 0:
                     list_photo = [el for el in photo_loc]
                     bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc)
@@ -759,7 +658,7 @@ try:
             my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
             bot.send_message(message.chat.id, "вот ваше сообщение:")
-            send_adv_message_submit(message, message.chat.id)
+            send_adv_message_submit(message.chat.id)
             message_text = "Выберите каналы, в которые должна пойти рассылка"
             bot.send_message(message.chat.id, message_text, reply_markup=markup)
 

@@ -1,7 +1,12 @@
 {
-  "access_token_vk": "YOUR ACCESS TOKEN VK",
-  "token": "YOUR API TOKEN",
-  "general_admin": "YOUR CHAT ID",
-  "path_to_db": "YOUR PATH TABLE",
-  "name_table": "YOUR NAME TABLE"
+  "access_token_vk": "YOUR ACCESS TOKEN VK PROFILE",
+  "token": "TOKEN BOT",
+  "general_admin": "GENERAL CHAT ID",
+  "path_to_db": "PATH TO DATA BASE FILE",
+  "name_table": "NAME MAIN TABLE",
+  "name_table_adv": "NAME ADV TABLE",
+  "blacklist": ["YOUR STOP FOR ALL TG CHANNEL"],
+  "photo_skip": ["TG CHANNEL SKIP PHOTO"],
+  "moderators": ["YOUR ALL MODERATORS (NOT MAIN ADMIN)"],
+  "interval": "YOUR INTERVAL (INT) SECONDS"
 }

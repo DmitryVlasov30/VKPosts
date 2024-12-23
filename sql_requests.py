@@ -32,7 +32,6 @@ def clear_inf(count_posts: int, name_table=name_tbl) -> list:
     global path
     db = connect(path)
     curr = db.cursor()
-    posts = []
     try:
         curr.execute(f"""
             SELECT vk_id, tg_channel, posts_id, quantity
@@ -40,11 +39,9 @@ def clear_inf(count_posts: int, name_table=name_tbl) -> list:
             WHERE quantity > {count_posts}
         """)
         posts = curr.fetchall()
-        #print(posts)
         for element in map(lambda x: list(x), posts):
             arr = element[2].split()
-            if len(arr) >= count_posts:
-                #print(arr)
+            if len(arr) >= count_posts+10:
                 arr = list(sorted(arr, key=lambda x: int(x)))
                 arr = arr[-count_posts:]
             else:
@@ -52,8 +49,6 @@ def clear_inf(count_posts: int, name_table=name_tbl) -> list:
 
             count = len(arr)
             element[2] = " ".join(arr)
-            #print(element[2])
-            #print(element[2])
             element[3] = count
             curr.execute(f"""
                 UPDATE {name_tbl} SET posts_id = ?, quantity = ?
