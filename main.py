@@ -459,12 +459,12 @@ try:
         global my_keyboard, my_group_for_keyboard
 
         call_data = call.data.split()
-        vk, tg, action = call_data[0], call_data[1], call_data[2]
+        tg, action = call_data[0], call_data[1]
         new_marcup = InlineKeyboardMarkup(row_width=1)
         for i, el in enumerate(my_group_for_keyboard):
-            if el[-2] == tg and el[-1] == vk:
-                status_buttons[f"{el[0]} {el[1]}"] = "not"
-                my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg} {vk}", callback_data=f"{tg} {vk} not")
+            if el == tg:
+                status_buttons[el] = "not"
+                my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg}", callback_data=f"{tg} not")
         new_marcup.add(*my_keyboard)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
@@ -477,18 +477,19 @@ try:
         global my_keyboard, my_group_for_keyboard
 
         call_data = call.data.split()
-        vk, tg, action = call_data[0], call_data[1], call_data[2]
+        tg, action = call_data[0], call_data[1]
         new_marcup = InlineKeyboardMarkup(row_width=1)
         for i, el in enumerate(my_group_for_keyboard):
-            if el[-1] == tg and el[-2] == vk:
-                status_buttons[f"{el[0]} {el[1]}"] = "add"
-                my_keyboard[i] = InlineKeyboardButton(text=f"{tg} {vk}", callback_data=f"{tg} {vk} add")
+            if el == tg:
+                status_buttons[el] = "add"
+                my_keyboard[i] = InlineKeyboardButton(text=f"{tg}", callback_data=f"{tg} add")
         new_marcup.add(*my_keyboard)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=new_marcup
         )
+        logger.info("использованна функция del_submit")
 
 
     def save_submit(call):
@@ -500,12 +501,12 @@ try:
         photo_adv = set()
         video_adv = set()
         list_group = ""
-        for vk, tg in my_group_for_keyboard:
-            if status_buttons[f"{vk} {tg}"] == "not":
-                list_group += f"{vk} {tg}/"
+        for tg in my_group_for_keyboard:
+            if status_buttons[tg] == "not":
+                list_group += f"{tg}/"
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
         bot.send_message(call.message.chat.id, "реклама сохраненна")
-        logger.info("использованна функция ")
+        logger.info("использованна функция save_submit")
         return
 
 
@@ -522,7 +523,7 @@ try:
     def send_adv_posts(adv_lst: list) -> None:
         for adv in adv_lst:
             adv_text_inf, adv_photo_inf, adv_video_inf = adv[1].split("/")
-            group_post_adv = [vk_tg.split()[1] for vk_tg in adv[3].split("/") if vk_tg != '']
+            group_post_adv = [tg for tg in adv[3].split("/") if tg != '']
             for tg in group_post_adv:
                 send_adv_message_submit(
                     chat_id=f"@{tg}",
@@ -573,7 +574,7 @@ try:
         try:
             given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
         except ValueError:
-            logger.info("Неверный формат времени")
+            logger.info("Неверный формат времени в функции time_defference")
             return "Неверный формат времени. Используйте 'часы:минуты день.месяц.год'."
         current_time = datetime.now()
         current_time, given_time = given_time, current_time
@@ -695,11 +696,11 @@ try:
             my_group_for_keyboard = []
             status_buttons = {}
             text_adv = date_adv_text[1]
-
-            for tg, vk in vk_public:
-                status_buttons[f"{vk} {tg}"] = "add"
-                my_group_for_keyboard.append([vk, tg])
-                my_keyboard.append(InlineKeyboardButton(f"{tg} {vk}", callback_data=f"{tg} {vk} add"))
+            tg_channel = set(el[0] for el in vk_public)
+            for tg in tg_channel:
+                status_buttons[tg] = "add"
+                my_group_for_keyboard.append(tg)
+                my_keyboard.append(InlineKeyboardButton(f"{tg}", callback_data=f"{tg} add"))
 
             my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
