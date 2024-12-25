@@ -8,5 +8,6 @@
   "blacklist": ["YOUR STOP FOR ALL TG CHANNEL"],
   "photo_skip": ["TG CHANNEL SKIP PHOTO"],
   "moderators": ["YOUR ALL MODERATORS (NOT MAIN ADMIN)"],
-  "interval": "YOUR INTERVAL (INT) SECONDS"
+  "interval": "YOUR INTERVAL (INT) SECONDS",
+  "path_to_logs": "PATH TO LOG FILE"
 }
