@@ -23,7 +23,7 @@ with open("data.json") as data:
     TOKEN = inf["token"]
     GENERAL_ADMIN = inf["general_admin"]
     ADMIN_CHAT_ID = inf["moderators"]
-    LOG_PATH = Path(inf["logs_file"])
+    LOG_PATH = Path(inf["path_to_logs"])
     INTERVAL = inf["interval"]
 
 bot = TeleBot(token=TOKEN)
