@@ -10,6 +10,12 @@ from json import load
 from traceback import format_exc
 from datetime import datetime
 from threading import Timer
+from pathlib import Path
+
+
+from loguru import logger
+
+
 
 with open("data.json") as data:
     inf = load(data)
@@ -17,6 +23,8 @@ with open("data.json") as data:
     TOKEN = inf["token"]
     GENERAL_ADMIN = inf["general_admin"]
     ADMIN_CHAT_ID = inf["moderators"]
+    LOG_PATH = Path(inf["logs_file"])
+    INTERVAL = inf["interval"]
 
 bot = TeleBot(token=TOKEN)
 ADMIN_CHAT_ID.append(GENERAL_ADMIN)
@@ -54,7 +62,6 @@ try:
             if 'Chat not found' in str(ex):
                 flag_tg = False
         ans = (flag_vk, flag_tg)
-        inf_text = ""
         match ans:
             case (True, False):
                 inf_text = "Группы ТГ не существует"
@@ -71,19 +78,22 @@ try:
 
     def group_all_information(group_name, information=None):
         global ACCESS_TOKEN_VK
-        vk = vk_api.VkApi(token=ACCESS_TOKEN_VK)
-        response = vk.method('groups.getById', {'group_ids': group_name})
-        match information:
-            case 'id':
-                return str(response[0].get('id', None))
-            case 'name':
-                return response[0].get('name', None)
-            case 'link':
-                return f'https://vk.com/{response[0].get("screen_name", None)}'
-            case 'screen_name':
-                return response[0].get('screen_name', group_name)
-            case _:
-                return response[0]
+        try:
+            vk = vk_api.VkApi(token=ACCESS_TOKEN_VK)
+            response = vk.method('groups.getById', {'group_ids': group_name})
+            match information:
+                case 'id':
+                    return str(response[0].get('id', None))
+                case 'name':
+                    return response[0].get('name', None)
+                case 'link':
+                    return f'https://vk.com/{response[0].get("screen_name", None)}'
+                case 'screen_name':
+                    return response[0].get('screen_name', group_name)
+                case _:
+                    return response[0]
+        except Exception as ex:
+            logger.error(f"function: group all information ---- {ex}")
 
 
     def add_inf_message(vk, tg):
@@ -161,19 +171,27 @@ try:
                     post_inf.append([text_post, list_size_photo])
 
         except vk_api.exceptions.ApiError as ex:
-            print(ex)
+            logger.error(f"function: post_information --- {ex}")
             pass
 
+        id_posts = ""
         for el in all_message:
             el[1] = sorted(map(int, el[1]))
             posts = " ".join(list(map(str, el[1])))
+            if int(el[0][0]) == group_id and str(el[0][1]) == group_tg:
+                id_posts = posts
             update_inf(el[0][0], el[0][1], posts)
-
+        if list(post_inf):
+            logger.info(f"function: post_information"
+                        f"group tg: {group_tg},"
+                        f" group vk: {group_all_information(group_id, information='link')},"
+                        f" posts: {id_posts}")
         return list(reversed(post_inf))
 
 
     @bot.message_handler(commands=["start"])
     def main(message) -> None:
+        global LOG_PATH
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
                         'Используйте команду /help для вызова списка функций\n\n'
                         '<em><u><i>Сreated by Vlasov</i></u></em>\n'
@@ -183,13 +201,17 @@ try:
         start_timer(message)
         create_main_table()
         create_adv_table()
+        logger.add(LOG_PATH,
+                   rotation="10 MB",
+                   compression="zip",
+                   level="DEBUG")
+        logger.info("была использованна функция main")
 
 
     if not flag_stop:
         def start_timer(message):
-            with open("data.json") as file:
-                interval = load(file)["interval"]
-            Timer(interval, message_post, args=(message,)).start()
+            global INTERVAL
+            Timer(INTERVAL, message_post, args=(message,)).start()
 
 
     @bot.message_handler(commands=["add"])
@@ -218,7 +240,9 @@ try:
                 bot.send_message(chat, 'Группa уже отслеживается')
                 return
             bot.send_message(chat, 'Группa отслеживается')
+            logger.info("была успешно использованна фукция add_vk_tg_group")
         except Exception as ex:
+            logger.error(f'Произошла ошибка: {ex} в функции add_vk_tg_group')
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции add_vk_tg_group')
 
 
@@ -256,6 +280,7 @@ try:
                 return
             bot.send_message(chat, 'Группа удалена')
         except Exception as ex:
+            logger.error(f"Произошла ошибка: {ex} в функции del_group")
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции del_group')
 
 
@@ -275,7 +300,10 @@ try:
                     if new_posts is None:
                         for admin in ADMIN_CHAT_ID:
                             bot.send_message(admin, "функция post_information вернула None")
+                            logger.error("функция post_information вернула None")
                         return
+
+                    count_id = 0
                     for text_post, photo_post in new_posts:
                         try:
                             if filter_photo(vk):
@@ -299,16 +327,21 @@ try:
                             elif len(photo_post) == 0 and text_post != '' and filter_add(text_post):
                                 bot.send_message(f'@{tg}', text_post)
                             elif len(photo_post) == 0 and text_post == '':
-                                pass
+                                continue
+
+                            count_id += 1
                         except Exception as ex:
                             for el in ADMIN_CHAT_ID:
+                                logger.error(f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}')
                                 bot.send_message(el,
                                     f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}'
                                 )
                             continue
-
+                    if count_id != len(new_posts):
+                        logger.debug(f"количество опубликованных постов не равно количеству пришедших постов в VK: {vk}, TG: {tg}")
 
             except Exception as ex:
+                logger.error(f'Произошла ошибка: {ex} в функции message_post')
                 for el in ADMIN_CHAT_ID:
                     bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post')
             finally:
@@ -336,6 +369,7 @@ try:
                           f'*TG*: `{tg}`\n'
                           f'*[LINK]({vk_link})*\n\n')
         bot.send_message(message.chat.id, inf_group, parse_mode='MarkdownV2', disable_web_page_preview=True)
+        logger.info("была использованна функция get_group_list")
 
 
     @bot.message_handler(commands=['help'])
@@ -351,6 +385,7 @@ try:
                         '/stop -> останавливает бота\n'
                         '/my_id -> выводит ваш chat id')
         bot.send_message(message.chat.id, message_text)
+        logger.info("использованна функция help_func")
 
 
     @bot.message_handler(commands=["my_id"])
@@ -366,6 +401,7 @@ try:
             bot.send_message(el, 'Работа бота завершена')
         flag_stop = True
         bot.stop_bot()
+        logger.info("использованна функция остановки бота")
         exit(0)
 
 
@@ -391,12 +427,14 @@ try:
                     f"<b>Дата публикации</b>:  {el[2]}\n"
                     f"<b>каналы куда пойдет рассылка</b>: \n{'\n'.join(el[3].split("/"))}\n")
             bot.send_message(message.chat.id, text, parse_mode='html')
+            logger.info("использованна функция get_adv_inf")
 
 
     @bot.message_handler(commands=["reset_all"])
     @ignoring_not_admin_message
     def reset_all_data(message):
         delete_all_inf()
+        logger.info("использованна функция reset_all_data")
         bot.send_message(message.chat.id, "реклама отчищена")
 
 
@@ -467,6 +505,7 @@ try:
                 list_group += f"{vk} {tg}/"
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
         bot.send_message(call.message.chat.id, "реклама сохраненна")
+        logger.info("использованна функция ")
         return
 
 
@@ -492,6 +531,7 @@ try:
                     text=adv_text_inf,
                     local_func=True
                 )
+            logger.info("использованна функция send_adv_posts")
 
 
 
@@ -533,6 +573,7 @@ try:
         try:
             given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
         except ValueError:
+            logger.info("Неверный формат времени")
             return "Неверный формат времени. Используйте 'часы:минуты день.месяц.год'."
         current_time = datetime.now()
         current_time, given_time = given_time, current_time
@@ -555,70 +596,74 @@ try:
 
     def send_adv_message_submit(chat_id, photo="-", video="-", text="-", local_func=False):
         global photo_adv, video_adv, text_adv
-        if not local_func:
-            photo_loc = photo_adv
-            video_loc = video_adv
-            text_loc = text_adv
-        else:
-            photo_loc = photo.split() if photo != "-" else []
-            video_loc = video.split() if video != "-" else []
-            text_loc = text if text != "-" else ""
-        list_photo = []
-        list_video = []
-        media_all = []
-        if text_loc == "":
-            if len(photo_loc) >= 1:
-                list_photo = [InputMediaPhoto(media=photo_id) for photo_id in photo_loc]
-            if len(video_loc) >= 1:
-                list_video = [InputMediaVideo(media=video_id) for video_id in video_loc]
-
-            if len(list_video) > 1 or len(list_photo) > 1:
-                media_all.extend(list_video)
-                media_all.extend(list_photo)
-
-            if len(video_loc) + len(photo_loc) > 1:
-                bot.send_media_group(chat_id=chat_id, media=media_all)
+        try:
+            if not local_func:
+                photo_loc = photo_adv
+                video_loc = video_adv
+                text_loc = text_adv
             else:
-                if len(photo_loc) == 1 and len(video_loc) == 0:
-                    list_photo = [el for el in photo_loc]
-                    bot.send_photo(chat_id=chat_id, photo=list_photo[0])
-                if len(video_loc) == 1 and len(photo_loc) == 0:
-                    list_video = [el for el in video_loc]
-                    bot.send_video(chat_id=chat_id, video=list_video[0])
-        else:
-            if len(photo_loc) == 0 and len(video_loc) == 0:
-                bot.send_message(chat_id=chat_id, text=text_loc)
-            if len(video_loc) != 0 and len(photo_loc) != 0:
-                for i, el in enumerate(video_loc):
-                    if i == 0:
-                        list_video.append(InputMediaVideo(media=el, caption=text_loc))
-                        continue
-                    list_video.append(InputMediaVideo(media=el))
-                list_photo = [InputMediaPhoto(media=el) for el in photo_loc]
-            elif len(photo_loc) > 1 and len(video_loc) == 0:
-                for i, el in enumerate(photo_loc):
-                    if i == 0:
-                        list_photo.append(InputMediaPhoto(media=el, caption=text_loc))
-                        continue
-                    list_photo.append(InputMediaPhoto(media=el))
-            elif len(video_loc) > 1 and len(photo_loc) == 0:
-                for i, el in enumerate(video_loc):
-                    if i == 0:
-                        list_video.append(InputMediaVideo(media=el, caption=text_loc))
-                        continue
-                    list_video.append(InputMediaVideo(media=el))
+                photo_loc = photo.split() if photo != "-" else []
+                video_loc = video.split() if video != "-" else []
+                text_loc = text if text != "-" else ""
+            list_photo = []
+            list_video = []
+            media_all = []
+            if text_loc == "":
+                if len(photo_loc) >= 1:
+                    list_photo = [InputMediaPhoto(media=photo_id) for photo_id in photo_loc]
+                if len(video_loc) >= 1:
+                    list_video = [InputMediaVideo(media=video_id) for video_id in video_loc]
 
-            if len(video_loc) + len(photo_loc) > 1:
-                media_all.extend(list_photo)
-                media_all.extend(list_video)
-                bot.send_media_group(chat_id=chat_id, media=media_all)
+                if len(list_video) > 1 or len(list_photo) > 1:
+                    media_all.extend(list_video)
+                    media_all.extend(list_photo)
+
+                if len(video_loc) + len(photo_loc) > 1:
+                    bot.send_media_group(chat_id=chat_id, media=media_all)
+                else:
+                    if len(photo_loc) == 1 and len(video_loc) == 0:
+                        list_photo = [el for el in photo_loc]
+                        bot.send_photo(chat_id=chat_id, photo=list_photo[0])
+                    if len(video_loc) == 1 and len(photo_loc) == 0:
+                        list_video = [el for el in video_loc]
+                        bot.send_video(chat_id=chat_id, video=list_video[0])
             else:
-                if len(photo_loc) == 1 and len(video_loc) == 0:
-                    list_photo = [el for el in photo_loc]
-                    bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc)
-                if len(video_loc) == 1 and len(photo_loc) == 0:
-                    list_video = [el for el in video_loc]
-                    bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_loc)
+                if len(photo_loc) == 0 and len(video_loc) == 0:
+                    bot.send_message(chat_id=chat_id, text=text_loc)
+                if len(video_loc) != 0 and len(photo_loc) != 0:
+                    for i, el in enumerate(video_loc):
+                        if i == 0:
+                            list_video.append(InputMediaVideo(media=el, caption=text_loc))
+                            continue
+                        list_video.append(InputMediaVideo(media=el))
+                    list_photo = [InputMediaPhoto(media=el) for el in photo_loc]
+                elif len(photo_loc) > 1 and len(video_loc) == 0:
+                    for i, el in enumerate(photo_loc):
+                        if i == 0:
+                            list_photo.append(InputMediaPhoto(media=el, caption=text_loc))
+                            continue
+                        list_photo.append(InputMediaPhoto(media=el))
+                elif len(video_loc) > 1 and len(photo_loc) == 0:
+                    for i, el in enumerate(video_loc):
+                        if i == 0:
+                            list_video.append(InputMediaVideo(media=el, caption=text_loc))
+                            continue
+                        list_video.append(InputMediaVideo(media=el))
+
+                if len(video_loc) + len(photo_loc) > 1:
+                    media_all.extend(list_photo)
+                    media_all.extend(list_video)
+                    bot.send_media_group(chat_id=chat_id, media=media_all)
+                else:
+                    if len(photo_loc) == 1 and len(video_loc) == 0:
+                        list_photo = [el for el in photo_loc]
+                        bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc)
+                    if len(video_loc) == 1 and len(photo_loc) == 0:
+                        list_video = [el for el in video_loc]
+                        bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_loc)
+
+        except Exception as ex:
+            logger.error(f"ошибка в функции send_adv_message: {ex}")
 
 
     @bot.message_handler(content_types=["text"])
@@ -628,6 +673,7 @@ try:
         date_adv_text = inf_post_adv(message)
         if not date_adv_text:
             bot.send_message(message.chat.id, "вы ввели что-то не так")
+            logger.info("введен неизвестный текст в функции adv_newsletter")
             return
 
         date = time_difference(date_adv_text[0])
@@ -664,11 +710,14 @@ try:
 
 
         except Exception as ex:
+            logger.error(f"{ex} (error)!")
             bot.send_message(message.chat.id, f'Произошла ошибка: {ex} в функции adv_newsletter')
 
 
 except:
-    print(format_exc())
+    logger.error(f"{format_exc()}")
+
 
 print('bot worked')
 bot.infinity_polling(timeout=10, long_polling_timeout=150)
+logger.info("бот остановлен")
