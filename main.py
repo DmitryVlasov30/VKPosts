@@ -42,6 +42,7 @@ message_id_adv = ""
 
 try:
 
+    @logger.catch
     def check_exist_groups(vk, tg) -> str:
         global ACCESS_TOKEN_VK
 
@@ -96,6 +97,7 @@ try:
             logger.error(f"function: group all information ---- {ex}")
 
 
+    @logger.catch
     def add_inf_message(vk, tg):
         id_group = group_all_information(vk, 'id')
 
@@ -124,6 +126,7 @@ try:
 
     @bot.message_handler(commands=["list_adm"])
     @ignoring_not_admin_message
+    @logger.catch
     def adm_list(message) -> None:
         global ADMIN_CHAT_ID
         inf_user = ''
@@ -190,6 +193,7 @@ try:
 
 
     @bot.message_handler(commands=["start"])
+    @logger.catch
     def main(message) -> None:
         global LOG_PATH
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
@@ -209,6 +213,7 @@ try:
 
 
     if not flag_stop:
+        @logger.catch
         def start_timer(message):
             global INTERVAL
             Timer(INTERVAL, message_post, args=(message,)).start()
@@ -285,6 +290,7 @@ try:
 
 
     if not flag_stop:
+        @logger.catch
         def message_post(message):
             global ADMIN_CHAT_ID
 
@@ -354,6 +360,7 @@ try:
 
     @bot.message_handler(commands=["group"])
     @ignoring_not_admin_message
+    @logger.catch
     def get_group_list(message) -> None:
         all_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
 
@@ -374,6 +381,7 @@ try:
 
     @bot.message_handler(commands=['help'])
     @ignoring_not_admin_message
+    @logger.catch
     def help_func(message) -> None:
         message_text = ('/start -> перезапускает интервал проверки постов из ВК и выводит начальную информацию\n'
                         '/add("ссылка на паблик в вк" "username вашего тг канала") -> добавляет канал и тг для пересылки постов\n'
@@ -395,6 +403,7 @@ try:
 
     @bot.message_handler(commands=["stop"])
     @ignoring_not_admin_message
+    @logger.catch
     def stop_bot(message) -> None:
         global ADMIN_CHAT_ID, flag_stop
         for el in ADMIN_CHAT_ID:
@@ -407,6 +416,7 @@ try:
 
     @bot.message_handler(commands=["my_adv"])
     @ignoring_not_admin_message
+    @logger.catch
     def get_adv_inf(message):
         all_inf = get_db_inf(name_table=name_tbl_adv)
         if not len(all_inf):
@@ -430,15 +440,17 @@ try:
             logger.info("использованна функция get_adv_inf")
 
 
-    @bot.message_handler(commands=["reset_all"])
+    @bot.message_handler(commands=["delet_db"])
     @ignoring_not_admin_message
+    @logger.catch
     def reset_all_data(message):
         delete_all_inf()
-        logger.info("использованна функция reset_all_data")
+        logger.info("использованна функция delet_db")
         bot.send_message(message.chat.id, "реклама отчищена")
 
 
     @bot.message_handler(commands=["reset"])
+    @logger.catch
     def reset_adv_inf(message, flag_message=True):
         global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
             message_id_adv
@@ -453,8 +465,10 @@ try:
         message_id_adv = ""
         if flag_message:
             bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
+        logger.info("использованна функция reset")
 
 
+    @logger.catch
     def add_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
@@ -473,6 +487,7 @@ try:
         )
 
 
+    @logger.catch
     def del_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
@@ -492,6 +507,7 @@ try:
         logger.info("использованна функция del_submit")
 
 
+    @logger.catch
     def save_submit(call):
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons, date_adv
 
@@ -520,6 +536,7 @@ try:
         return ready_adv
 
 
+    @logger.catch
     def send_adv_posts(adv_lst: list) -> None:
         for adv in adv_lst:
             adv_text_inf, adv_photo_inf, adv_video_inf = adv[1].split("/")
@@ -537,6 +554,7 @@ try:
 
 
     @bot.callback_query_handler(func=lambda call: True)
+    @logger.catch
     def callback(call):
         match call.data.split()[-1]:
             case "add":
@@ -547,6 +565,7 @@ try:
                 save_submit(call)
 
 
+    @logger.catch
     def inf_post_adv(message) -> tuple:
         message_text = message.text
         if message_text is None or message_text[:4].strip() != "/adv":
@@ -561,6 +580,7 @@ try:
 
 
     @bot.message_handler(content_types=["video", "photo"])
+    @logger.catch
     def add_video_photo(message) -> None:
         global video_adv, photo_adv, text_adv
         match message.content_type:
@@ -570,6 +590,7 @@ try:
                 photo_adv.add(message.photo[-1].file_id)
 
 
+    @logger.catch
     def time_difference(input_time):
         try:
             given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
@@ -709,6 +730,7 @@ try:
             message_text = "Выберите каналы, в которые должна пойти рассылка"
             bot.send_message(message.chat.id, message_text, reply_markup=markup)
 
+            logger.info("использованна функция adv_newsletter")
 
         except Exception as ex:
             logger.error(f"{ex} (error)!")
