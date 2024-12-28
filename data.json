@@ -5,9 +5,10 @@
   "path_to_db": "PATH TO DATA BASE FILE",
   "name_table": "NAME MAIN TABLE",
   "name_table_adv": "NAME ADV TABLE",
-  "blacklist": ["YOUR STOP FOR ALL TG CHANNEL"],
-  "photo_skip": ["TG CHANNEL SKIP PHOTO"],
-  "moderators": ["YOUR ALL MODERATORS (NOT MAIN ADMIN)"],
+  "blacklist": ["YOUR STOP FOR ALL TG CHANNEL (NOT NECESSARY)"],
+  "photo_skip": ["TG CHANNEL SKIP PHOTO (NOT NECESSARY)"],
+  "moderators": ["YOUR ALL MODERATORS (NOT MAIN ADMIN) (NOT NECESSARY)"],
   "interval": "YOUR INTERVAL (INT) SECONDS",
-  "path_to_logs": "PATH TO LOG FILE"
+  "path_to_logs": "PATH TO LOG FILE",
+  "replace_word": ["LIST YOUR REPLACE WORLD ON POSTS (NOT NECESSARY)"]
 }
