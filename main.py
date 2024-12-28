@@ -492,7 +492,7 @@ try:
 
 
     @logger.catch
-    def add_submit(call) -> None:
+    def change_submit(call) -> None:
         global my_keyboard, my_group_for_keyboard
 
         call_data = call.data.split()
@@ -500,34 +500,20 @@ try:
         new_marcup = InlineKeyboardMarkup(row_width=1)
         for i, el in enumerate(my_group_for_keyboard):
             if el == tg:
-                status_buttons[el] = "not"
-                my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg}", callback_data=f"{tg} not")
+                if action == "add":
+                    status_buttons[el] = "not"
+                    my_keyboard[i] = InlineKeyboardButton(text=f"✅{tg}", callback_data=f"{tg} not")
+                if action == "not":
+                    status_buttons[el] = "add"
+                    my_keyboard[i] = InlineKeyboardButton(text=f"{tg}", callback_data=f"{tg} add")
+
         new_marcup.add(*my_keyboard)
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=new_marcup
         )
-
-
-    @logger.catch
-    def del_submit(call) -> None:
-        global my_keyboard, my_group_for_keyboard
-
-        call_data = call.data.split()
-        tg, action = call_data[0], call_data[1]
-        new_marcup = InlineKeyboardMarkup(row_width=1)
-        for i, el in enumerate(my_group_for_keyboard):
-            if el == tg:
-                status_buttons[el] = "add"
-                my_keyboard[i] = InlineKeyboardButton(text=f"{tg}", callback_data=f"{tg} add")
-        new_marcup.add(*my_keyboard)
-        bot.edit_message_reply_markup(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=new_marcup
-        )
-        logger.info("использована функция del_submit")
+        logger.info("использована функция change_submit")
 
 
     def delete_submit_message(message, check_exist_media=False):
@@ -598,9 +584,9 @@ try:
     def callback(call):
         match call.data.split()[-1]:
             case "add":
-                add_submit(call)
+                change_submit(call)
             case "not":
-                del_submit(call)
+                change_submit(call)
             case "end":
                 save_submit(call)
 
