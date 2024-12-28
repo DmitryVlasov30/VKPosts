@@ -1,4 +1,5 @@
 from json import load
+from pydoc import replace
 
 
 def filter_photo(vk) -> bool:
@@ -20,3 +21,12 @@ def filter_add(text) -> bool:
     if 'http://' in text or 'https://' in text or len(text) == 1 or 't.me/' in text:
         return False
     return True
+
+
+def replace_warning_word(text_post: str):
+    with open("data.json") as file:
+        replace_word = load(file)["replace_word"]
+
+    for word in replace_word:
+        text_post = text_post.replace(word, "")
+    return text_post
