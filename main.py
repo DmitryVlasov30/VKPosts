@@ -1,6 +1,6 @@
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
     delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv
-from filter_adv import filter_add, filter_photo
+from filter_adv import filter_add, filter_photo, replace_warning_word
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -11,7 +11,6 @@ from traceback import format_exc
 from datetime import datetime
 from threading import Timer
 from pathlib import Path
-
 
 from loguru import logger
 
@@ -245,7 +244,7 @@ try:
                 bot.send_message(chat, 'Группa уже отслеживается')
                 return
             bot.send_message(chat, 'Группa отслеживается')
-            logger.info("была успешно использованна фукция add_vk_tg_group")
+            logger.info("была успешно использована функция add_vk_tg_group")
         except Exception as ex:
             logger.error(f'Произошла ошибка: {ex} в функции add_vk_tg_group')
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции add_vk_tg_group')
@@ -284,6 +283,7 @@ try:
                 bot.send_message(chat, text_otv)
                 return
             bot.send_message(chat, 'Группа удалена')
+            logger.info("успешно использована функция del_group")
         except Exception as ex:
             logger.error(f"Произошла ошибка: {ex} в функции del_group")
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции del_group')
@@ -314,6 +314,9 @@ try:
                         try:
                             if filter_photo(vk):
                                 photo_post = []
+
+                            text_post = replace_warning_word(text_post)
+                            logger.info(text_post)
 
                             if text_post == '' and len(photo_post) > 1:
                                 media = [InputMediaPhoto(media=url) for url in photo_post]
@@ -410,7 +413,7 @@ try:
             bot.send_message(el, 'Работа бота завершена')
         flag_stop = True
         bot.stop_bot()
-        logger.info("использованна функция остановки бота")
+        logger.info("использована функция остановки бота")
         exit(0)
 
 
@@ -435,23 +438,43 @@ try:
             text = (f"информация о вашей рекламе:\n"
                     f"<b>id</b>: {el[0]}\n"
                     f"<b>Дата публикации</b>:  {el[2]}\n"
-                    f"<b>каналы куда пойдет рассылка</b>: \n{'\n'.join(el[3].split("/"))}\n")
+                    f"<b>каналы куда пойдет рассылка</b>: \n{' '.join(el[3].split('/'))}\n")
             bot.send_message(message.chat.id, text, parse_mode='html')
-            logger.info("использованна функция get_adv_inf")
+            logger.info("использована функция get_adv_inf")
 
 
-    @bot.message_handler(commands=["delet_db"])
+    @bot.message_handler(commands=["delete"])
     @ignoring_not_admin_message
     @logger.catch
     def reset_all_data(message):
-        delete_all_inf()
-        logger.info("использованна функция delet_db")
-        bot.send_message(message.chat.id, "реклама отчищена")
+        if len(message.text) == 7:
+            bot.send_message(message.chat.id, "использована функция без указаний")
+            logger.info("функция delete без аргументов")
+            return
+
+        match message.text[7:].lower().strip():
+            case "all":
+                delete_all_inf()
+                logger.info("использована функция delete с аргументом all")
+                bot.send_message(message.chat.id, "реклама отчищена")
+                return
+            case _:
+                argument = message.text[7:].lower().strip()
+                if argument.isdigit():
+                    id_col = get_db_inf(name_table=name_tbl_adv, name_col="id")
+                    if int(argument) in [el[0] for el in id_col]:
+                        delete_all_inf(rule=f"WHERE id = {argument}")
+                        bot.send_message(message.chat.id, "реклама успешно удалена")
+                        logger.info("реклама удалена в функции delete")
+                    else:
+                        bot.send_message(message.chat.id, "реклама с таким id не найдена")
+                        logger.info("реклама не найдена в функции delete")
+
 
 
     @bot.message_handler(commands=["reset"])
     @logger.catch
-    def reset_adv_inf(message, flag_message=True):
+    def reset_adv_inf(message, local_use=True) -> None:
         global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
             message_id_adv
         my_keyboard = []
@@ -463,9 +486,9 @@ try:
         video_adv = set()
         date_adv = ""
         message_id_adv = ""
-        if flag_message:
+        if local_use:
             bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
-        logger.info("использованна функция reset")
+        logger.info("использована функция reset")
 
 
     @logger.catch
@@ -504,7 +527,14 @@ try:
             message_id=call.message.message_id,
             reply_markup=new_marcup
         )
-        logger.info("использованна функция del_submit")
+        logger.info("использована функция del_submit")
+
+
+    def delete_submit_message(message, check_exist_media=False):
+        bot.delete_message(message.chat.id, message.id)
+        bot.delete_message(message.chat.id, message.id - 1)
+        if check_exist_media:
+            bot.delete_message(message.chat.id, message.id - 2)
 
 
     @logger.catch
@@ -514,15 +544,25 @@ try:
         inf_adv = (f"{text_adv if text_adv else '-'}"
                    f"/{' '.join([el for el in photo_adv]) if photo_adv else '-'}/"
                    f"{' '.join(el for el in video_adv) if video_adv else '-'}")
+        check_exist_media = True if photo_adv or video_adv else False
         photo_adv = set()
         video_adv = set()
         list_group = ""
         for tg in my_group_for_keyboard:
             if status_buttons[tg] == "not":
                 list_group += f"{tg}/"
+
+        if not list_group:
+            reset_adv_inf(call.message, local_use=False)
+            delete_submit_message(call.message, check_exist_media=check_exist_media)
+            bot.send_message(call.message.chat.id, "вы не выбрали ни одного канала, информация о вашей рекламе отчищена")
+            logger.info("не выбрано ни одного паблика в функции save_submit")
+            return
+
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
-        bot.send_message(call.message.chat.id, "реклама сохраненна")
-        logger.info("использованна функция save_submit")
+        delete_submit_message(call.message, check_exist_media=check_exist_media)
+        bot.send_message(call.message.chat.id, "реклама сохранена")
+        logger.info("использована функция save_submit")
         return
 
 
@@ -549,7 +589,7 @@ try:
                     text=adv_text_inf,
                     local_func=True
                 )
-            logger.info("использованна функция send_adv_posts")
+            logger.info("использована функция send_adv_posts")
 
 
 
@@ -701,7 +741,7 @@ try:
         date = time_difference(date_adv_text[0])
         date_adv = date_adv_text[0]
         if not type(date) is dict:
-            reset_adv_inf(message, flag_message=False)
+            reset_adv_inf(message, local_use=False)
             text = ""
             if type(date) is int:
                 text = "вы ввели дату, которая меньше нынешней"
