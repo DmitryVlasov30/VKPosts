@@ -201,14 +201,14 @@ def delete_adv_inf(id_del: int, name_table=name_tbl_adv):
     return text_mistake
 
 
-def delete_all_inf(name_table=name_tbl_adv):
+def delete_all_inf(rule="", name_table=name_tbl_adv):
     global path
 
     db = connect(path)
     text_mistake = ""
     try:
         curr = db.cursor()
-        curr.execute(F"""DELETE FROM {name_table}""")
+        curr.execute(f"""DELETE FROM {name_table} {rule}""")
     except Exception as ex:
         text_mistake = ex
     finally:
