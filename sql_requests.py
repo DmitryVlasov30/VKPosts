@@ -218,7 +218,7 @@ def delete_all_inf(rule="", name_table=name_tbl_adv):
     return text_mistake
 
 
-def tg_table(name_table=name_tbl_channel):
+def create_tg_table(name_table=name_tbl_channel):
     global path
 
     db = connect(path)
@@ -226,7 +226,7 @@ def tg_table(name_table=name_tbl_channel):
     curr.execute(f"""
         CREATE TABLE IF NOT EXISTS {name_table} (
             "id"	INTEGER NOT NULL UNIQUE,
-            "tg_channel"    TEXT NOT NULL
+            "tg_channel"    TEXT NOT NULL,
             PRIMARY KEY("id" AUTOINCREMENT)
         )
     """)
@@ -244,6 +244,22 @@ def new_channel(tg_channel: str, name_table=name_tbl_channel):
             INSERT INTO {name_table} (tg_channel) VALUES
                 (?)
         """, (tg_channel,))
+    except Exception as ex:
+        return ex
+    finally:
+        db.commit()
+        db.close()
+
+
+def delete_channel(tg):
+    global path
+
+    db = connect(path)
+    curr = db.cursor()
+    try:
+        curr.execute(f"""
+            DELETE FROM {name_tbl_channel} WHERE tg_channel = ?
+        """, (tg,))
     except Exception as ex:
         return ex
     finally:
