@@ -24,6 +24,7 @@ with open("data.json") as data:
     ADMIN_CHAT_ID = inf["moderators"]
     LOG_PATH = Path(inf["path_to_logs"])
     INTERVAL = inf["interval"]
+    list_adv_channel = inf["adv_channel"]
 
 bot = TeleBot(token=TOKEN)
 ADMIN_CHAT_ID.append(GENERAL_ADMIN)
@@ -427,7 +428,8 @@ try:
             return
 
         for el in all_inf:
-            adv_text_inf, adv_photo_inf, adv_video_inf = el[1].split("/")
+            print(el[1].split("&"))
+            adv_text_inf, adv_photo_inf, adv_video_inf = el[1].split("&")
             send_adv_message_submit(
                 chat_id=message.chat.id,
                 video=adv_video_inf,
@@ -528,7 +530,7 @@ try:
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons, date_adv
 
         inf_adv = (f"{text_adv if text_adv else '-'}"
-                   f"/{' '.join([el for el in photo_adv]) if photo_adv else '-'}/"
+                   f"&{' '.join([el for el in photo_adv]) if photo_adv else '-'}&"
                    f"{' '.join(el for el in video_adv) if video_adv else '-'}")
         check_exist_media = True if photo_adv or video_adv else False
         photo_adv = set()
@@ -565,7 +567,7 @@ try:
     @logger.catch
     def send_adv_posts(adv_lst: list) -> None:
         for adv in adv_lst:
-            adv_text_inf, adv_photo_inf, adv_video_inf = adv[1].split("/")
+            adv_text_inf, adv_photo_inf, adv_video_inf = adv[1].split("&")
             group_post_adv = [tg for tg in adv[3].split("/") if tg != '']
             for tg in group_post_adv:
                 send_adv_message_submit(
@@ -677,7 +679,7 @@ try:
                         bot.send_video(chat_id=chat_id, video=list_video[0])
             else:
                 if len(photo_loc) == 0 and len(video_loc) == 0:
-                    bot.send_message(chat_id=chat_id, text=text_loc)
+                    bot.send_message(chat_id=chat_id, text=text_loc, parse_mode='html')
                 if len(video_loc) != 0 and len(photo_loc) != 0:
                     for i, el in enumerate(video_loc):
                         if i == 0:
@@ -705,10 +707,10 @@ try:
                 else:
                     if len(photo_loc) == 1 and len(video_loc) == 0:
                         list_photo = [el for el in photo_loc]
-                        bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc)
+                        bot.send_photo(chat_id=chat_id, photo=list_photo[0], caption=text_loc, parse_mode='html')
                     if len(video_loc) == 1 and len(photo_loc) == 0:
                         list_video = [el for el in video_loc]
-                        bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_loc)
+                        bot.send_video(chat_id=chat_id, video=list_video[0], caption=text_loc, parse_mode='html')
 
         except Exception as ex:
             logger.error(f"ошибка в функции send_adv_message: {ex}")
@@ -717,7 +719,9 @@ try:
     @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
     def adv_newsletter(message) -> None:
-        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, photo_adv, video_adv
+        global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, \
+            photo_adv, video_adv, list_adv_channel
+
         date_adv_text = inf_post_adv(message)
         if not date_adv_text:
             bot.send_message(message.chat.id, "вы ввели что-то не так")
@@ -744,6 +748,9 @@ try:
             status_buttons = {}
             text_adv = date_adv_text[1]
             tg_channel = set(el[0] for el in vk_public)
+            for el in set(list_adv_channel):
+                tg_channel.add(el)
+
             for tg in tg_channel:
                 status_buttons[tg] = "add"
                 my_group_for_keyboard.append(tg)
