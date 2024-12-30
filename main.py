@@ -1,5 +1,6 @@
-from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
-    delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel, name_tbl_channel
+from sql_requests import (get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table,
+                          new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel, name_tbl_channel,
+                          delete_channel, delete_adv_inf)
 from filter_adv import filter_add, filter_photo, replace_warning_word
 
 import vk_api.exceptions
@@ -24,7 +25,6 @@ with open("data.json") as data:
     ADMIN_CHAT_ID = inf["moderators"]
     LOG_PATH = Path(inf["path_to_logs"])
     INTERVAL = inf["interval"]
-    list_adv_channel = inf["adv_channel"]
 
 bot = TeleBot(token=TOKEN)
 ADMIN_CHAT_ID.append(GENERAL_ADMIN)
@@ -512,6 +512,7 @@ try:
             return
         new_channel(tg_channel=tg)
         bot.send_message(message.chat.id, "Канал добавлен ко всем в список")
+        logger.info("использована функция")
 
 
     @bot.message_handler(commands=["my_tg"])
@@ -525,6 +526,12 @@ try:
         for tg in tg_list:
             message_text += f"`{tg[0]}`\n"
 
+        if message_text.strip() == "Ваши каналы:":
+            bot.send_message(message.chat.id, "вы не добавили ни одного канала")
+            logger.info("использована функция")
+            return
+
+        logger.info("использована функция")
         bot.send_message(message.chat.id, message_text, parse_mode="MarkdownV2")
 
 
@@ -539,7 +546,11 @@ try:
             logger.info("ТГ канала не существует")
             return
 
-        delete_all_inf(rule=f"WHERE tg_channel = {tg}", name_table=name_tbl_channel)
+        mistake = delete_channel(tg)
+        if len(mistake) > 1:
+            logger.info(mistake)
+            bot.send_message(message.chat.id, "что то пошло не так при удалении из бд")
+        logger.info("использована функция")
         bot.send_message(message.chat.id, "канал удален")
 
 
@@ -793,13 +804,14 @@ try:
             return
 
         try:
-            vk_public = get_db_inf(name_col="tg_channel vk_screen")
             markup = InlineKeyboardMarkup(row_width=1)
             my_keyboard = []
             my_group_for_keyboard = []
             status_buttons = {}
             text_adv = date_adv_text[1]
-            tg_channel = set(get_db_inf(name_col="tg_channel", name_table=name_tbl_channel))
+            tg_channel = set([
+                el[0] for el in get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
+            ])
 
             for tg in tg_channel:
                 status_buttons[tg] = "add"
