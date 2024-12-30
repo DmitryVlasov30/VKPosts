@@ -1,5 +1,5 @@
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
-    delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel
+    delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel, name_tbl_channel
 from filter_adv import filter_add, filter_photo, replace_warning_word
 
 import vk_api.exceptions
@@ -504,7 +504,30 @@ try:
     @ignoring_not_admin_message
     @logger.catch
     def update_tg(message):
-        message_text = message.text[3:].strip() if len(message.text) > 3 else ""
+        tg = message.text[3:].strip() if len(message.text) > 3 else ""
+
+        if not check_exist_groups(tg=tg, vk="-"):
+            bot.send_message(message.chat.id, "ТГ канала не существует")
+            logger.info("ТГ канала не существует")
+            return
+        new_channel(tg_channel=tg)
+        bot.send_message(message.chat.id, "Канал добавлен ко всем в список")
+
+
+    @bot.message_handler(commands=["my_tg"])
+    @ignoring_not_admin_message
+    @logger.catch
+    def getter_my_tg(message):
+        tg_list = get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
+        message_text = ""
+
+        for tg in tg_list:
+            message_text += (f"Ваши каналы:\n"
+                             f"`{tg}`\n")
+
+        bot.send_message(message.chat.id, message_text)
+
+
 
 
 
