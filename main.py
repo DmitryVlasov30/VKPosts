@@ -1,5 +1,5 @@
 from sql_requests import get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table, \
-    delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv
+    delete_adv_inf, new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel
 from filter_adv import filter_add, filter_photo, replace_warning_word
 
 import vk_api.exceptions
@@ -29,7 +29,6 @@ with open("data.json") as data:
 bot = TeleBot(token=TOKEN)
 ADMIN_CHAT_ID.append(GENERAL_ADMIN)
 flag_stop = False
-
 my_keyboard = []
 my_group_for_keyboard = []
 status_buttons = {}
@@ -46,23 +45,30 @@ try:
     def check_exist_groups(vk, tg) -> str:
         global ACCESS_TOKEN_VK
 
-        flag_vk = False
-        flag_tg = False
-        vk_session = vk_api.VkApi(token=ACCESS_TOKEN_VK).get_api()
-        try:
-            vk_session.groups.getById(group_id=vk)
-            flag_vk = True
-        except vk_api.exceptions.ApiError as ex:
-            if ex.code == 100:
-                flag_vk = False
-
-        try:
-            bot.get_chat(f'@{tg}')
-            flag_tg = True
-        except Exception as ex:
-            if 'Chat not found' in str(ex):
-                flag_tg = False
+        flag_vk = False if tg != "-" else "-"
+        flag_tg = False if vk != "-" else "-"
+        if vk != "-":
+            vk_session = vk_api.VkApi(token=ACCESS_TOKEN_VK).get_api()
+            try:
+                vk_session.groups.getById(group_id=vk)
+                flag_vk = True
+            except vk_api.exceptions.ApiError as ex:
+                if ex.code == 100:
+                    flag_vk = False
+        if tg != "-":
+            try:
+                bot.get_chat(f'@{tg}')
+                flag_tg = True
+            except Exception as ex:
+                if 'Chat not found' in str(ex):
+                    flag_tg = False
         ans = (flag_vk, flag_tg)
+
+        if flag_vk == "-":
+            return flag_tg
+        if flag_tg == "-":
+            return flag_tg
+
         match ans:
             case (True, False):
                 inf_text = "Группы ТГ не существует"
@@ -205,6 +211,7 @@ try:
         start_timer(message)
         create_main_table()
         create_adv_table()
+        create_tg_table()
         logger.add(LOG_PATH,
                    rotation="10 MB",
                    compression="zip",
@@ -491,6 +498,14 @@ try:
         if local_use:
             bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
         logger.info("использована функция reset")
+
+
+    @bot.message_handler(commands=["tg"])
+    @ignoring_not_admin_message
+    @logger.catch
+    def update_tg(message):
+        message_text = message.text[3:].strip() if len(message.text) > 3 else ""
+
 
 
     @logger.catch
