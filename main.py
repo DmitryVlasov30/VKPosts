@@ -528,6 +528,20 @@ try:
         bot.send_message(message.chat.id, message_text)
 
 
+    @bot.message_handler(commands=["del_tg"])
+    @ignoring_not_admin_message
+    @logger.catch
+    def delete_tg_channel(message):
+        tg = message.text[7:].strip() if len(message.text) > 7 else ""
+
+        if not check_exist_groups(tg=tg, vk="-"):
+            bot.send_message(message.chat.id, "ТГ канала не существует")
+            logger.info("ТГ канала не существует")
+            return
+
+        delete_all_inf(rule=f"WHERE tg_channel = {tg}", name_table=name_tbl_channel)
+        bot.send_message(message.chat.id, "канал удален")
+        
 
 
 
