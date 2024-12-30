@@ -7,6 +7,7 @@ with open("data.json") as data:
     path = Path(inf["path_to_db"])
     name_tbl = inf["name_table"]
     name_tbl_adv = inf["name_table_adv"]
+    name_tbl_channel = inf["all_tg"]
 
 
 def create_main_table(name_db=name_tbl):
@@ -215,3 +216,36 @@ def delete_all_inf(rule="", name_table=name_tbl_adv):
         db.commit()
         db.close()
     return text_mistake
+
+
+def tg_table(name_table=name_tbl_channel):
+    global path
+
+    db = connect(path)
+    curr = db.cursor()
+    curr.execute(f"""
+        CREATE TABLE IF NOT EXISTS {name_table} (
+            "id"	INTEGER NOT NULL UNIQUE,
+            "tg_channel"    TEXT NOT NULL
+            PRIMARY KEY("id" AUTOINCREMENT)
+        )
+    """)
+    db.commit()
+    db.close()
+
+
+def new_channel(tg_channel: str, name_table=name_tbl_channel):
+    global path
+
+    db = connect(path)
+    curr = db.cursor()
+    try:
+        curr.execute(f"""
+            INSERT INTO {name_table} (tg_channel) VALUES
+                (?)
+        """, (tg_channel,))
+    except Exception as ex:
+        return ex
+    finally:
+        db.commit()
+        db.close()
