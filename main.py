@@ -518,14 +518,14 @@ try:
     @ignoring_not_admin_message
     @logger.catch
     def getter_my_tg(message):
+        print(name_tbl_channel)
         tg_list = get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
-        message_text = ""
+        message_text = "Ваши каналы:\n"
 
         for tg in tg_list:
-            message_text += (f"Ваши каналы:\n"
-                             f"`{tg}`\n")
+            message_text += f"`{tg[0]}`\n"
 
-        bot.send_message(message.chat.id, message_text)
+        bot.send_message(message.chat.id, message_text, parse_mode="MarkdownV2")
 
 
     @bot.message_handler(commands=["del_tg"])
@@ -541,7 +541,7 @@ try:
 
         delete_all_inf(rule=f"WHERE tg_channel = {tg}", name_table=name_tbl_channel)
         bot.send_message(message.chat.id, "канал удален")
-        
+
 
 
 
@@ -799,9 +799,7 @@ try:
             my_group_for_keyboard = []
             status_buttons = {}
             text_adv = date_adv_text[1]
-            tg_channel = set(el[0] for el in vk_public)
-            for el in set(list_adv_channel):
-                tg_channel.add(el)
+            tg_channel = set(get_db_inf(name_col="tg_channel", name_table=name_tbl_channel))
 
             for tg in tg_channel:
                 status_buttons[tg] = "add"
