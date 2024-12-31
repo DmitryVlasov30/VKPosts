@@ -2,6 +2,7 @@ from sql_requests import (get_db_inf, new_inf, clear_inf, delete_inf, create_mai
                           new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel, name_tbl_channel,
                           delete_channel, delete_adv_inf)
 from filter_adv import filter_add, filter_photo, replace_warning_word
+from format_adv_text import formation
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -387,7 +388,7 @@ try:
                           f'*TG*: `{tg}`\n'
                           f'*[LINK]({vk_link})*\n\n')
         bot.send_message(message.chat.id, inf_group, parse_mode='MarkdownV2', disable_web_page_preview=True)
-        logger.info("была использованна функция get_group_list")
+        logger.info("была использована функция get_group_list")
 
 
     @bot.message_handler(commands=['help'])
@@ -808,7 +809,7 @@ try:
             my_keyboard = []
             my_group_for_keyboard = []
             status_buttons = {}
-            text_adv = date_adv_text[1]
+            text_adv = formation(date_adv_text[1])
             tg_channel = set([
                 el[0] for el in get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
             ])
