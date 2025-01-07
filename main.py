@@ -27,6 +27,10 @@ with open("data.json") as data:
     LOG_PATH = Path(inf["path_to_logs"])
     INTERVAL = inf["interval"]
 
+
+logger.add(LOG_PATH, level="DEBUG")
+
+
 bot = TeleBot(token=TOKEN)
 ADMIN_CHAT_ID.append(GENERAL_ADMIN)
 flag_stop = False
@@ -35,8 +39,7 @@ my_group_for_keyboard = []
 status_buttons = {}
 inf_adv = ""
 text_adv = ""
-photo_adv = set()
-video_adv = set()
+photo_adv, video_adv = set(), set()
 date_adv = ""
 message_id_adv = ""
 
@@ -46,8 +49,8 @@ try:
     def check_exist_groups(vk, tg) -> str:
         global ACCESS_TOKEN_VK
 
-        flag_vk = False if tg != "-" else "-"
-        flag_tg = False if vk != "-" else "-"
+        flag_vk = False if vk != "-" else "-"
+        flag_tg = False if tg != "-" else "-"
         if vk != "-":
             vk_session = vk_api.VkApi(token=ACCESS_TOKEN_VK).get_api()
             try:
@@ -150,6 +153,7 @@ try:
         post_inf = []
         all_message = get_db_inf(name_col="vk_id tg_channel posts_id")
         all_message = [[[vk_id, tg], posts.split()] for vk_id, tg, posts in all_message]
+        log_posts = []
         try:
             response = vk.method('wall.get', {
                 'owner_id': -group_id,
@@ -167,13 +171,19 @@ try:
                     if el[0][0] == group_id and el[0][1] == group_tg:
                         id_post = el[1]
                 if not str(post.get('id', '')) in list(map(str, id_post)):
+                    logger.debug(f"post_get: {post.get('id', '')} post_now: {list(map(str, id_post))}")
+                    log_posts.extend(list(map(str, id_post)))
+                    log_posts.append(str(post.get("id", "")))
                     for el in all_message:
                         if el[0][0] == group_id and el[0][1] == group_tg:
                             el[1].append(str(post.get('id')))
+                            lst = sorted(map(int, el[1]))
+                            posts = " ".join(list(map(str, lst)))
+                            update_inf(el[0][0], el[0][1], posts)
                     text_post = post.get('text', '')
                     list_size_photo = []
                     if 'attachments' in post:
-                        for attachments in post['attachments']:
+                        for attachments in post.get("attachments", []):
                             if attachments['type'] == 'photo':
                                 for count, link in enumerate(attachments['photo']['sizes']):
                                     if count == len(attachments['photo']['sizes']) - 1:
@@ -184,18 +194,18 @@ try:
             logger.error(f"function: post_information --- {ex}")
             pass
 
-        id_posts = ""
-        for el in all_message:
-            el[1] = sorted(map(int, el[1]))
-            posts = " ".join(list(map(str, el[1])))
-            if int(el[0][0]) == group_id and str(el[0][1]) == group_tg:
-                id_posts = posts
-            update_inf(el[0][0], el[0][1], posts)
+        # id_posts = ""
+        # for el in all_message:
+        #     el[1] = sorted(map(int, el[1]))
+        #     posts = " ".join(list(map(str, el[1])))
+        #     if int(el[0][0]) == group_id and str(el[0][1]) == group_tg:
+        #         id_posts = posts
+        #     update_inf(el[0][0], el[0][1], posts)
         if list(post_inf):
             logger.info(f"function: post_information"
                         f"group tg: {group_tg},"
                         f" group vk: {group_all_information(group_id, information='link')},"
-                        f" posts: {id_posts}")
+                        f"posts: {log_posts}")
         return list(reversed(post_inf))
 
 
@@ -213,10 +223,6 @@ try:
         create_main_table()
         create_adv_table()
         create_tg_table()
-        logger.add(LOG_PATH,
-                   rotation="10 MB",
-                   compression="zip",
-                   level="DEBUG")
         logger.info("была использованна функция main")
 
 
@@ -253,7 +259,7 @@ try:
                 bot.send_message(chat, 'Группa уже отслеживается')
                 return
             bot.send_message(chat, 'Группa отслеживается')
-            logger.info("была успешно использована функция add_vk_tg_group")
+            logger.info(f"была успешно использована функция пользователем c id {chat}")
         except Exception as ex:
             logger.error(f'Произошла ошибка: {ex} в функции add_vk_tg_group')
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции add_vk_tg_group')
@@ -292,7 +298,7 @@ try:
                 bot.send_message(chat, text_otv)
                 return
             bot.send_message(chat, 'Группа удалена')
-            logger.info("успешно использована функция del_group")
+            logger.info(f"успешно использована функция пользователем c id {chat}")
         except Exception as ex:
             logger.error(f"Произошла ошибка: {ex} в функции del_group")
             bot.send_message(chat, f'Произошла ошибка: {ex} в функции del_group')
@@ -324,8 +330,8 @@ try:
                             if filter_photo(vk):
                                 photo_post = []
 
-                            text_post = replace_warning_word(text_post)
-                            logger.info(text_post)
+                            text_post = replace_warning_word(text_post, tg)
+                            logger.info(text_post if text_post != "" else "текст ненайден")
 
                             if text_post == '' and len(photo_post) > 1:
                                 media = [InputMediaPhoto(media=url) for url in photo_post]
@@ -388,7 +394,7 @@ try:
                           f'*TG*: `{tg}`\n'
                           f'*[LINK]({vk_link})*\n\n')
         bot.send_message(message.chat.id, inf_group, parse_mode='MarkdownV2', disable_web_page_preview=True)
-        logger.info("была использована функция get_group_list")
+        logger.info(f"была использована функция пользователем c id {message.chat.id}")
 
 
     @bot.message_handler(commands=['help'])
@@ -403,9 +409,16 @@ try:
                         '/new_adm("chat id") -> добавляет админа в список\n'
                         '/del_adm("chat id или username") -> удаляет админа\n'
                         '/stop -> останавливает бота\n'
-                        '/my_id -> выводит ваш chat id')
+                        '/my_id -> выводит ваш chat id\n'
+                        '/adv(дата рассылки в формате: /час:время день.месяц.год/, после написания даты, нужно указать текст рассылки, но до вызова функции нужно отправить видео и фото для рассылки) -> отправляет рекламу в указанное время\n'
+                        '/my_adv -> выводит список рекламных рассылок, которые вы добавили\n'
+                        '/delete(параметр: all - если вы хотите удалитб все рекламные рассылки, id рекламной рассылки, можно получить в функции my_adv) -> удаляет рассылку\n'
+                        '/tg(username тг канала) -> обавляет тг кнала в общую базу данных\n'
+                        '/del_tg(username тг канала) -> удаляет тг канал из общей базы\n'
+                        '/my_tg -> выводит все тг каналы в базе данных\n'
+                        '/reset -> отчищает промежуточную информацию о рекламной рассылке')
         bot.send_message(message.chat.id, message_text)
-        logger.info("использованна функция help_func")
+        logger.info(f"использованна функция пользователем c id {message.chat.id}")
 
 
     @bot.message_handler(commands=["my_id"])
@@ -422,7 +435,7 @@ try:
             bot.send_message(el, 'Работа бота завершена')
         flag_stop = True
         bot.stop_bot()
-        logger.info("использована функция остановки бота")
+        logger.info(f"использована функция пользователем c id {message.chat.id}")
         exit(0)
 
 
@@ -436,7 +449,6 @@ try:
             return
 
         for el in all_inf:
-            print(el[1].split("&"))
             adv_text_inf, adv_photo_inf, adv_video_inf = el[1].split("&")
             send_adv_message_submit(
                 chat_id=message.chat.id,
@@ -450,7 +462,7 @@ try:
                     f"<b>Дата публикации</b>:  {el[2]}\n"
                     f"<b>каналы куда пойдет рассылка</b>: \n{' '.join(el[3].split('/'))}\n")
             bot.send_message(message.chat.id, text, parse_mode='html')
-            logger.info("использована функция get_adv_inf")
+            logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
     @bot.message_handler(commands=["delete"])
@@ -459,7 +471,7 @@ try:
     def reset_all_data(message):
         if len(message.text) == 7:
             bot.send_message(message.chat.id, "использована функция без указаний")
-            logger.info("функция delete без аргументов")
+            logger.info(f"функция delete без аргументов пользователем c id {message.chat.id}")
             return
 
         match message.text[7:].lower().strip():
@@ -498,7 +510,7 @@ try:
         message_id_adv = ""
         if local_use:
             bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
-        logger.info("использована функция reset")
+        logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
     @bot.message_handler(commands=["tg"])
@@ -507,20 +519,33 @@ try:
     def update_tg(message):
         tg = message.text[3:].strip() if len(message.text) > 3 else ""
 
+        if 'https://t.me' in tg:
+            tg = tg.split('/')[-1]
+
+        if '@' in tg:
+            tg = tg.replace('@', '')
+
         if not check_exist_groups(tg=tg, vk="-"):
             bot.send_message(message.chat.id, "ТГ канала не существует")
             logger.info("ТГ канала не существует")
             return
+
+        all_inf = get_db_inf(name_table=name_tbl_channel)
+        for el in all_inf:
+            if el[1] == tg:
+                bot.send_message(message.chat.id, "канал уже присутствует в бд")
+                logger.info("канал уже присутствует в бд")
+                return
+
         new_channel(tg_channel=tg)
         bot.send_message(message.chat.id, "Канал добавлен ко всем в список")
-        logger.info("использована функция")
+        logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
     @bot.message_handler(commands=["my_tg"])
     @ignoring_not_admin_message
     @logger.catch
     def getter_my_tg(message):
-        print(name_tbl_channel)
         tg_list = get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
         message_text = "Ваши каналы:\n"
 
@@ -529,10 +554,10 @@ try:
 
         if message_text.strip() == "Ваши каналы:":
             bot.send_message(message.chat.id, "вы не добавили ни одного канала")
-            logger.info("использована функция")
+            logger.info(f"использована функция пользователем c id {message.chat.id}")
             return
 
-        logger.info("использована функция")
+        logger.info(f"использована функция пользователем c id {message.chat.id}")
         bot.send_message(message.chat.id, message_text, parse_mode="MarkdownV2")
 
 
@@ -542,16 +567,11 @@ try:
     def delete_tg_channel(message):
         tg = message.text[7:].strip() if len(message.text) > 7 else ""
 
-        if not check_exist_groups(tg=tg, vk="-"):
-            bot.send_message(message.chat.id, "ТГ канала не существует")
-            logger.info("ТГ канала не существует")
-            return
-
         mistake = delete_channel(tg)
-        if len(mistake) > 1:
+        if not mistake is None:
             logger.info(mistake)
             bot.send_message(message.chat.id, "что то пошло не так при удалении из бд")
-        logger.info("использована функция")
+        logger.info(f"использована функция пользователем c id {message.chat.id}")
         bot.send_message(message.chat.id, "канал удален")
 
 
@@ -579,7 +599,7 @@ try:
             message_id=call.message.message_id,
             reply_markup=new_marcup
         )
-        logger.info("использована функция change_submit")
+        logger.info(f"использована функция пользователем c id {call.message.chat.id}")
 
 
     def delete_submit_message(message, check_exist_media=False):
@@ -614,7 +634,7 @@ try:
         new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
         delete_submit_message(call.message, check_exist_media=check_exist_media)
         bot.send_message(call.message.chat.id, "реклама сохранена")
-        logger.info("использована функция save_submit")
+        logger.info(f"использована функция пользователем c id {call.message.chat.id}")
         return
 
 
@@ -641,7 +661,7 @@ try:
                     text=adv_text_inf,
                     local_func=True
                 )
-            logger.info("использована функция send_adv_posts")
+            logger.info("использована функция")
 
 
 
@@ -687,7 +707,7 @@ try:
         try:
             given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
         except ValueError:
-            logger.info("Неверный формат времени в функции time_defference")
+            logger.info("Неверный формат времени")
             return "Неверный формат времени. Используйте 'часы:минуты день.месяц.год'."
         current_time = datetime.now()
         current_time, given_time = given_time, current_time
@@ -784,7 +804,7 @@ try:
     @ignoring_not_admin_message
     def adv_newsletter(message) -> None:
         global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, \
-            photo_adv, video_adv, list_adv_channel
+            photo_adv, video_adv
 
         date_adv_text = inf_post_adv(message)
         if not date_adv_text:
@@ -819,14 +839,14 @@ try:
                 my_group_for_keyboard.append(tg)
                 my_keyboard.append(InlineKeyboardButton(f"{tg}", callback_data=f"{tg} add"))
 
-            my_keyboard.append(InlineKeyboardButton(f"подтвердить", callback_data="end"))
+            my_keyboard.append(InlineKeyboardButton("подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
             bot.send_message(message.chat.id, "вот ваше сообщение:")
             send_adv_message_submit(message.chat.id)
             message_text = "Выберите каналы, в которые должна пойти рассылка"
             bot.send_message(message.chat.id, message_text, reply_markup=markup)
 
-            logger.info("использованна функция adv_newsletter")
+            logger.info(f"использованна функция пользователем c id {message.chat.id}")
 
         except Exception as ex:
             logger.error(f"{ex} (error)!")
