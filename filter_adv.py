@@ -1,5 +1,4 @@
 from json import load
-from pydoc import replace
 
 
 def filter_photo(vk) -> bool:
@@ -23,7 +22,7 @@ def filter_add(text) -> bool:
     return True
 
 
-def replace_warning_word(text_post: str):
+def replace_warning_word(text_post: str, tg: str):
     with open("data.json") as file:
         replace_word = load(file)["replace_word"]
 
