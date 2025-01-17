@@ -11,7 +11,7 @@ from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardB
 from json import load
 from traceback import format_exc
 from datetime import datetime
-from threading import Timer
+from threading import Timer, current_thread, main_thread
 from pathlib import Path
 
 from loguru import logger
@@ -134,6 +134,17 @@ try:
         return wrapper
 
 
+    def main_thread_only(func):
+        def wrapper(*args, **kwargs):
+            if current_thread() is main_thread():
+                return func(*args, **kwargs)
+            else:
+                logger.error("Function can only be executed in the main thread.")
+                raise RuntimeError("Function can only be executed in the main thread.")
+
+        return wrapper
+
+
     @bot.message_handler(commands=["list_adm"])
     @ignoring_not_admin_message
     @logger.catch
@@ -147,6 +158,7 @@ try:
         bot.send_message(message.chat.id, inf_user, parse_mode='Markdown')
 
 
+    @main_thread_only
     def post_information(group_id: int, group_tg: str):
         global ACCESS_TOKEN_VK
         vk = VkApi(token=ACCESS_TOKEN_VK)
@@ -194,13 +206,6 @@ try:
             logger.error(f"function: post_information --- {ex}")
             pass
 
-        # id_posts = ""
-        # for el in all_message:
-        #     el[1] = sorted(map(int, el[1]))
-        #     posts = " ".join(list(map(str, el[1])))
-        #     if int(el[0][0]) == group_id and str(el[0][1]) == group_tg:
-        #         id_posts = posts
-        #     update_inf(el[0][0], el[0][1], posts)
         if list(post_inf):
             logger.info(f"function: post_information"
                         f"group tg: {group_tg},"
@@ -223,7 +228,7 @@ try:
         create_main_table()
         create_adv_table()
         create_tg_table()
-        logger.info("была использованна функция main")
+        logger.info("была использована функция main")
 
 
     if not flag_stop:
@@ -798,7 +803,6 @@ try:
 
         except Exception as ex:
             logger.error(f"ошибка в функции send_adv_message: {ex}")
-
 
     @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
