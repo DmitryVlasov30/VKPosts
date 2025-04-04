@@ -1,6 +1,11 @@
 from json import load
 
 
+with open("data.json") as f:
+    data = load(f)
+    skip_link = data["skip_link"]
+
+
 def filter_photo(vk) -> bool:
     with open("data.json") as file:
         filter_list = load(file)["photo_skip"]
@@ -17,6 +22,8 @@ def filter_add(text) -> bool:
     for el in domain_link:
         if el in text:
             return False
+    if not skip_link:
+        return True
     if 'http://' in text or 'https://' in text or len(text) == 1 or 't.me/' in text:
         return False
     return True
