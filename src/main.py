@@ -16,7 +16,7 @@ from pathlib import Path
 
 from loguru import logger
 
-with open("data.json") as data:
+with open("../data.json") as data:
     inf = load(data)
     ACCESS_TOKEN_VK = inf["access_token_vk"]
     TOKEN = inf["token"]
