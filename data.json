@@ -10,5 +10,6 @@
   "moderators": ["YOUR ALL MODERATORS (NOT MAIN ADMIN) (NOT NECESSARY)"],
   "interval": "YOUR INTERVAL (INT) SECONDS",
   "path_to_logs": "PATH TO LOG FILE",
-  "replace_word": ["LIST YOUR REPLACE WORLD ON POSTS (NOT NECESSARY)"]
+  "replace_word": ["LIST YOUR REPLACE WORLD ON POSTS (NOT NECESSARY)"],
+  "all_tg": "NAME YOUR TABLE FOR TG CHANNEL"
 }
