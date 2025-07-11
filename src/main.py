@@ -16,9 +16,7 @@ from pathlib import Path
 
 from loguru import logger
 
-
-
-with open("../data.json") as data:
+with open("data.json") as data:
     inf = load(data)
     ACCESS_TOKEN_VK = inf["access_token_vk"]
     TOKEN = inf["token"]
@@ -27,9 +25,7 @@ with open("../data.json") as data:
     LOG_PATH = Path(inf["path_to_logs"])
     INTERVAL = inf["interval"]
 
-
 logger.add(LOG_PATH, level="DEBUG")
-
 
 bot = TeleBot(token=TOKEN)
 ADMIN_CHAT_ID.append(GENERAL_ADMIN)
@@ -158,7 +154,6 @@ try:
         bot.send_message(message.chat.id, inf_user, parse_mode='Markdown')
 
 
-    @main_thread_only
     def post_information(group_id: int, group_tg: str):
         global ACCESS_TOKEN_VK
         vk = VkApi(token=ACCESS_TOKEN_VK)
@@ -209,6 +204,7 @@ try:
         if list(post_inf):
             logger.info(f"function: post_information"
                         f"group tg: {group_tg},"
+                        f"potok: {current_thread().name}"
                         f" group vk: {group_all_information(group_id, information='link')},"
                         f"posts: {log_posts}")
         return list(reversed(post_inf))
@@ -220,8 +216,7 @@ try:
         global LOG_PATH
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
                         'Используйте команду /help для вызова списка функций\n\n'
-                        '<em><u><i>Сreated by Vlasov</i></u></em>\n'
-                        'GitHub -> https://github.com/DmitryVlasov30')
+                        '<em><u><i>Сreated by Vlasov</i></u></em>')
         bot.send_message(message.chat.id, text_message, parse_mode='html')
 
         start_timer(message)
@@ -363,11 +358,13 @@ try:
                             for el in ADMIN_CHAT_ID:
                                 logger.error(f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}')
                                 bot.send_message(el,
-                                    f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}'
-                                )
+                                                 f'Произошла ошибка: {ex} в функции message_post. VK: {vk}, TG: {tg}'
+                                                 )
                             continue
                     if count_id != len(new_posts):
-                        logger.debug(f"количество опубликованных постов не равно количеству пришедших постов в VK: {vk}, TG: {tg}")
+                        logger.debug(
+                            f"количество опубликованных постов не равно количеству пришедших постов: VK: {vk}, TG: {tg}"
+                        )
 
             except Exception as ex:
                 logger.error(f'Произошла ошибка: {ex} в функции message_post')
@@ -407,23 +404,28 @@ try:
     @logger.catch
     def help_func(message) -> None:
         message_text = ('/start -> перезапускает интервал проверки постов из ВК и выводит начальную информацию\n'
-                        '/add("ссылка на паблик в вк" "username вашего тг канала") -> добавляет канал и тг для пересылки постов\n'
-                        '/del("название из ссылки на паблик в вк" "username вашего тг канала") -> удалит канал и тг для пересылки постов\n'
+                        '/add("ссылка на паблик в вк" "username вашего тг канала") -> добавляет канал и тг для '
+                        'пересылки постов\n'
+                        '/del("название из ссылки на паблик в вк" "username вашего тг канала") -> удалит канал и тг '
+                        'для пересылки постов\n'
                         '/group -> выводит список ваших тг и вк каналов\n'
                         '/list_adm -> возвращает список админов\n'
                         '/new_adm("chat id") -> добавляет админа в список\n'
                         '/del_adm("chat id или username") -> удаляет админа\n'
                         '/stop -> останавливает бота\n'
                         '/my_id -> выводит ваш chat id\n'
-                        '/adv(дата рассылки в формате: /час:время день.месяц.год/, после написания даты, нужно указать текст рассылки, но до вызова функции нужно отправить видео и фото для рассылки) -> отправляет рекламу в указанное время\n'
+                        '/adv(дата рассылки в формате: /час:время день.месяц.год/, после написания даты, '
+                        'нужно указать текст рассылки, но до вызова функции нужно отправить видео и фото для '
+                        'рассылки) -> отправляет рекламу в указанное время\n'
                         '/my_adv -> выводит список рекламных рассылок, которые вы добавили\n'
-                        '/delete(параметр: all - если вы хотите удалитб все рекламные рассылки, id рекламной рассылки, можно получить в функции my_adv) -> удаляет рассылку\n'
+                        '/delete(параметр: all - если вы хотите удалитб все рекламные рассылки, id рекламной '
+                        'рассылки, можно получить в функции my_adv) -> удаляет рассылку\n'
                         '/tg(username тг канала) -> обавляет тг кнала в общую базу данных\n'
                         '/del_tg(username тг канала) -> удаляет тг канал из общей базы\n'
                         '/my_tg -> выводит все тг каналы в базе данных\n'
                         '/reset -> отчищает промежуточную информацию о рекламной рассылке')
         bot.send_message(message.chat.id, message_text)
-        logger.info(f"использованна функция пользователем c id {message.chat.id}")
+        logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
     @bot.message_handler(commands=["my_id"])
@@ -496,7 +498,6 @@ try:
                     else:
                         bot.send_message(message.chat.id, "реклама с таким id не найдена")
                         logger.info("реклама не найдена в функции delete")
-
 
 
     @bot.message_handler(commands=["reset"])
@@ -573,13 +574,11 @@ try:
         tg = message.text[7:].strip() if len(message.text) > 7 else ""
 
         mistake = delete_channel(tg)
-        if not mistake is None:
+        if mistake is not None:
             logger.info(mistake)
             bot.send_message(message.chat.id, "что то пошло не так при удалении из бд")
         logger.info(f"использована функция пользователем c id {message.chat.id}")
         bot.send_message(message.chat.id, "канал удален")
-
-
 
 
     @logger.catch
@@ -632,7 +631,8 @@ try:
         if not list_group:
             reset_adv_inf(call.message, local_use=False)
             delete_submit_message(call.message, check_exist_media=check_exist_media)
-            bot.send_message(call.message.chat.id, "вы не выбрали ни одного канала, информация о вашей рекламе отчищена")
+            bot.send_message(call.message.chat.id,
+                             "вы не выбрали ни одного канала, информация о вашей рекламе отчищена")
             logger.info("не выбрано ни одного паблика в функции save_submit")
             return
 
@@ -667,7 +667,6 @@ try:
                     local_func=True
                 )
             logger.info("использована функция")
-
 
 
     @bot.callback_query_handler(func=lambda call: True)
@@ -804,6 +803,7 @@ try:
         except Exception as ex:
             logger.error(f"ошибка в функции send_adv_message: {ex}")
 
+
     @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
     def adv_newsletter(message) -> None:
@@ -859,7 +859,6 @@ try:
 
 except:
     logger.error(f"{format_exc()}")
-
 
 print('bot worked')
 bot.infinity_polling(timeout=10, long_polling_timeout=150)
