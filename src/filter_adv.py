@@ -1,13 +1,13 @@
 from json import load
 
 
-with open("data.json") as f:
+with open("../data.json") as f:
     data = load(f)
     skip_link = data["skip_link"]
 
 
 def filter_photo(vk) -> bool:
-    with open("data.json") as file:
+    with open("../data.json") as file:
         filter_list = load(file)["photo_skip"]
 
     if vk in filter_list:
@@ -16,7 +16,7 @@ def filter_photo(vk) -> bool:
 
 
 def filter_add(text) -> bool:
-    with open("data.json") as file:
+    with open("../data.json") as file:
         domain_link = load(file)["blacklist"]
 
     for el in domain_link:
@@ -30,7 +30,7 @@ def filter_add(text) -> bool:
 
 
 def replace_warning_word(text_post: str, tg: str):
-    with open("data.json") as file:
+    with open("../data.json") as file:
         replace_word = load(file)["replace_word"]
 
     for word in replace_word:

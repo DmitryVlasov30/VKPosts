@@ -2,7 +2,7 @@ from sqlite3 import connect
 from pathlib import Path
 from json import load
 
-with open("data.json") as data:
+with open("../data.json") as data:
     inf = load(data)
     path = Path(inf["path_to_db"])
     name_tbl = inf["name_table"]
