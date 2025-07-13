@@ -13,33 +13,30 @@ async def create_table():
 class VkTgTable:
 
     @staticmethod
-    def __format_insert_data(*args):
-        return [{
-            "vk_id": args[0],
-            "vk_screen": args[1],
-            "tg_channel": args[2],
-            "posts_id": args[3],
-            "quantity": len(args[3].split())
-        }]
-
-    @staticmethod
-    async def select_tg_vk():
+    async def select_tg_vk() -> list:
         async with db_helper.engin.connect() as session:
             query = (
                 select(VkTgChannel)
             )
 
             result = await session.execute(query)
-            return result.all()
+            return list(map(lambda el: list(el), result.all()))
 
-    async def insert_tg_vk(self, vk_id: int,
+    @staticmethod
+    async def insert_tg_vk(vk_id: int,
                            vk_screen: str,
                            tg_channel: str,
-                           posts: str) -> str:
+                           posts: str = "") -> str:
         async with db_helper.engin.connect() as session:
-            new_inf = self.__format_insert_data(vk_id, vk_screen, tg_channel, posts)
-            ins = insert(VkTgChannel).values(new_inf)
-            await session.execute(ins)
+            new_inf = [{
+                "vk_id": vk_id,
+                "vk_screen": vk_screen,
+                "tg_channel": tg_channel,
+                "posts_id": posts,
+                "quantity": len(posts.split())
+            }]
+            stmt = insert(VkTgChannel).values(new_inf)
+            await session.execute(stmt)
             await session.commit()
             return "success"
 
@@ -105,7 +102,7 @@ class AdvTable:
             )
 
             result = await session.execute(query)
-            return result.all()
+            return list(map(lambda el: list(el), result.all()))
 
     @staticmethod
     async def insert_adv(inf_adv: str, date_post: str, tg_vk_posting: str):
@@ -134,18 +131,25 @@ class AdvTable:
 
         return "success"
 
+    @staticmethod
+    async def all_delete_adv():
+        async with db_helper.engin.connect() as session:
+            stmt = delete(AdvPosts)
+            await session.execute(stmt)
+            await session.commit()
+            return "success"
+
 
 class TgChannelTable:
 
     @staticmethod
-    async def select_channel() -> list[tuple]:
+    async def select_channel() -> list[list]:
         async with db_helper.engin.connect() as session:
             query = (
                 select(TgChannel)
             )
             result = await session.execute(query)
-
-        return result.all()
+        return list(map(lambda el: list(el), result.all()))
 
     @staticmethod
     async def insert_channel(tg_channel: str) -> str:
