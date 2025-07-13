@@ -86,8 +86,33 @@ async def select_tg_vk():
         return result.all()
 
 
-async def update_posts():
-    pass
+async def update_posts(
+        vk_id: int,
+        tg_channel: str,
+        posts: str):
+    async with db_helper.engin.connect() as session:
+        query = (
+            select(VkTgChannel)
+            .filter(and_(VkTgChannel.vk_id == vk_id, VkTgChannel.tg_channel == tg_channel))
+        )
+        pab = await session.execute(query)
+        pab = list(pab.all()[0])
+        del_query = delete(VkTgChannel).filter(VkTgChannel.id == pab[0])
+        await session.execute(del_query)
+
+        new_data = [{
+            "id": pab[0],
+            "vk_id": pab[1],
+            "vk_screen": pab[2],
+            "tg_channel": pab[3],
+            "posts_id": posts,
+            "quantity": len(posts.split())
+        }]
+
+        await session.execute(insert(VkTgChannel).values(new_data))
+        await session.commit()
+
+    return "success"
 
 
 async def add_adv(inf_adv: str, date_post: str, tg_vk_posting: str):
