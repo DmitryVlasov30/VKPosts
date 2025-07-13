@@ -1,8 +1,6 @@
-from sql_requests import (get_db_inf, new_inf, clear_inf, delete_inf, create_main_table, update_inf, create_adv_table,
-                          new_adv_inf, delete_all_inf, name_tbl_adv, create_tg_table, new_channel, name_tbl_channel,
-                          delete_channel, delete_adv_inf)
-from filter_adv import filter_add, filter_photo, replace_warning_word
-from format_adv_text import formation
+from src.filter_adv import filter_add, filter_photo, replace_warning_word
+from src.format_adv_text import formation
+from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
 
 import vk_api.exceptions
 from vk_api import VkApi
@@ -104,18 +102,18 @@ try:
 
 
     @logger.catch
-    def add_inf_message(vk, tg):
+    async def add_inf_message(vk, tg):
         id_group = group_all_information(vk, 'id')
 
         if id_group is None:
             return False
-        inf_db = get_db_inf(name_col="vk_id tg_channel")
+        inf_db = [[el[1], el[3]] for el in await VkTgTable.select_tg_vk()]
         flag_exist = False
         for el in inf_db:
             if el[0] == int(id_group) and el[1] == tg:
                 flag_exist = True
         if not flag_exist:
-            new_inf(vk_id=int(id_group), vk_screen=vk, tg_channel=tg)
+            await VkTgTable.insert_tg_vk(vk_id=int(id_group), vk_screen=vk, tg_channel=tg)
         return flag_exist
 
 
@@ -154,11 +152,12 @@ try:
         bot.send_message(message.chat.id, inf_user, parse_mode='Markdown')
 
 
-    def post_information(group_id: int, group_tg: str):
+    async def post_information(group_id: int, group_tg: str):
         global ACCESS_TOKEN_VK
         vk = VkApi(token=ACCESS_TOKEN_VK)
         post_inf = []
-        all_message = get_db_inf(name_col="vk_id tg_channel posts_id")
+        all_message = await VkTgTable.select_tg_vk()
+        all_message = [[el[1], el[3], el[4]] for el in all_message]
         all_message = [[[vk_id, tg], posts.split()] for vk_id, tg, posts in all_message]
         log_posts = []
         try:
@@ -186,7 +185,7 @@ try:
                             el[1].append(str(post.get('id')))
                             lst = sorted(map(int, el[1]))
                             posts = " ".join(list(map(str, lst)))
-                            update_inf(el[0][0], el[0][1], posts)
+                            await VkTgTable.update_posts(vk_id=el[0][0], tg_channel=el[0][1], posts=posts)
                     text_post = post.get('text', '')
                     list_size_photo = []
                     if 'attachments' in post:
@@ -204,7 +203,7 @@ try:
         if list(post_inf):
             logger.info(f"function: post_information"
                         f"group tg: {group_tg},"
-                        f"potok: {current_thread().name}"
+                        f" thread: {current_thread().name}"
                         f" group vk: {group_all_information(group_id, information='link')},"
                         f"posts: {log_posts}")
         return list(reversed(post_inf))
@@ -212,17 +211,15 @@ try:
 
     @bot.message_handler(commands=["start"])
     @logger.catch
-    def main(message) -> None:
+    async def main(message) -> None:
         global LOG_PATH
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
                         'Используйте команду /help для вызова списка функций\n\n'
-                        '<em><u><i>Сreated by Vlasov</i></u></em>')
+                        '<em><u><i>Created by Vlasov</i></u></em>')
         bot.send_message(message.chat.id, text_message, parse_mode='html')
 
         start_timer(message)
-        create_main_table()
-        create_adv_table()
-        create_tg_table()
+        await create_table()
         logger.info("была использована функция main")
 
 
@@ -267,10 +264,10 @@ try:
 
     @bot.message_handler(commands=['del'])
     @ignoring_not_admin_message
-    def del_group(message) -> None:
+    async def del_group(message) -> None:
         chat = message.chat.id
         try:
-            all_inf = get_db_inf(name_col="vk_screen tg_channel")
+            all_inf = [[el[2], el[3]] for el in await VkTgTable.select_tg_vk()]
 
             vk, tg = message.text[4:].strip().split()
 
@@ -292,9 +289,9 @@ try:
                 return
 
             vk = group_all_information(vk, "id")
-            text_otv = delete_inf(vk, tg)
+            text_otv = await VkTgTable.delete_tg_vk(vk, tg)
 
-            if text_otv != "":
+            if text_otv != "success":
                 bot.send_message(chat, text_otv)
                 return
             bot.send_message(chat, 'Группа удалена')
@@ -306,18 +303,18 @@ try:
 
     if not flag_stop:
         @logger.catch
-        def message_post(message):
+        async def message_post(message):
             global ADMIN_CHAT_ID
 
             try:
-                group_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
+                group_inf = [[el[2], el[3], el[1]] for el in await VkTgTable.select_tg_vk()]
 
                 if len(group_inf) == 0:
                     start_timer(message)
                     return
 
                 for vk, tg, id_group_vk in group_inf:
-                    new_posts = post_information(id_group_vk, tg)
+                    new_posts = await post_information(id_group_vk, tg)
                     if new_posts is None:
                         for admin in ADMIN_CHAT_ID:
                             bot.send_message(admin, "функция post_information вернула None")
@@ -331,7 +328,7 @@ try:
                                 photo_post = []
 
                             text_post = replace_warning_word(text_post, tg)
-                            logger.info(text_post if text_post != "" else "текст ненайден")
+                            logger.info(text_post if text_post != "" else "текст не найден")
 
                             if text_post == '' and len(photo_post) > 1:
                                 media = [InputMediaPhoto(media=url) for url in photo_post]
@@ -371,8 +368,9 @@ try:
                 for el in ADMIN_CHAT_ID:
                     bot.send_message(el, f'Произошла ошибка: {ex} в функции message_post')
             finally:
-                clear_inf(15)
-                ready_adv = del_adv()
+                flag = await VkTgTable.clear_inf(15)
+                logger.info(flag)
+                ready_adv = await del_adv()
                 send_adv_posts(ready_adv)
                 start_timer(message)
                 return
@@ -381,8 +379,8 @@ try:
     @bot.message_handler(commands=["group"])
     @ignoring_not_admin_message
     @logger.catch
-    def get_group_list(message) -> None:
-        all_inf = get_db_inf(name_col="vk_screen tg_channel vk_id")
+    async def get_group_list(message) -> None:
+        all_inf = [[el[2], el[3], el[1]] for el in await VkTgTable.select_tg_vk()]
 
         if len(all_inf) == 0:
             bot.send_message(message.chat.id, "У вас нет групп")
@@ -418,9 +416,9 @@ try:
                         'нужно указать текст рассылки, но до вызова функции нужно отправить видео и фото для '
                         'рассылки) -> отправляет рекламу в указанное время\n'
                         '/my_adv -> выводит список рекламных рассылок, которые вы добавили\n'
-                        '/delete(параметр: all - если вы хотите удалитб все рекламные рассылки, id рекламной '
+                        '/delete(параметр: all - если вы хотите удалить все рекламные рассылки, id рекламной '
                         'рассылки, можно получить в функции my_adv) -> удаляет рассылку\n'
-                        '/tg(username тг канала) -> обавляет тг кнала в общую базу данных\n'
+                        '/tg(username тг канала) -> обновляет тг канала в общую базу данных\n'
                         '/del_tg(username тг канала) -> удаляет тг канал из общей базы\n'
                         '/my_tg -> выводит все тг каналы в базе данных\n'
                         '/reset -> отчищает промежуточную информацию о рекламной рассылке')
@@ -449,8 +447,8 @@ try:
     @bot.message_handler(commands=["my_adv"])
     @ignoring_not_admin_message
     @logger.catch
-    def get_adv_inf(message):
-        all_inf = get_db_inf(name_table=name_tbl_adv)
+    async def get_adv_inf(message):
+        all_inf = await AdvTable.select_adv()
         if not len(all_inf):
             bot.send_message(message.chat.id, "У вас нет рекламы")
             return
@@ -475,7 +473,7 @@ try:
     @bot.message_handler(commands=["delete"])
     @ignoring_not_admin_message
     @logger.catch
-    def reset_all_data(message):
+    async def reset_all_data(message):
         if len(message.text) == 7:
             bot.send_message(message.chat.id, "использована функция без указаний")
             logger.info(f"функция delete без аргументов пользователем c id {message.chat.id}")
@@ -483,16 +481,16 @@ try:
 
         match message.text[7:].lower().strip():
             case "all":
-                delete_all_inf()
+                await AdvTable.all_delete_adv()
                 logger.info("использована функция delete с аргументом all")
                 bot.send_message(message.chat.id, "реклама отчищена")
                 return
             case _:
                 argument = message.text[7:].lower().strip()
                 if argument.isdigit():
-                    id_col = get_db_inf(name_table=name_tbl_adv, name_col="id")
+                    id_col = [[el[0]] for el in await AdvTable.select_adv()]
                     if int(argument) in [el[0] for el in id_col]:
-                        delete_all_inf(rule=f"WHERE id = {argument}")
+                        await AdvTable.delete_adv(int(argument))
                         bot.send_message(message.chat.id, "реклама успешно удалена")
                         logger.info("реклама удалена в функции delete")
                     else:
@@ -522,7 +520,7 @@ try:
     @bot.message_handler(commands=["tg"])
     @ignoring_not_admin_message
     @logger.catch
-    def update_tg(message):
+    async def update_tg(message):
         tg = message.text[3:].strip() if len(message.text) > 3 else ""
 
         if 'https://t.me' in tg:
@@ -536,14 +534,14 @@ try:
             logger.info("ТГ канала не существует")
             return
 
-        all_inf = get_db_inf(name_table=name_tbl_channel)
+        all_inf = await TgChannelTable.select_channel()
         for el in all_inf:
             if el[1] == tg:
                 bot.send_message(message.chat.id, "канал уже присутствует в бд")
                 logger.info("канал уже присутствует в бд")
                 return
 
-        new_channel(tg_channel=tg)
+        await TgChannelTable.insert_channel(tg_channel=tg)
         bot.send_message(message.chat.id, "Канал добавлен ко всем в список")
         logger.info(f"использована функция пользователем c id {message.chat.id}")
 
@@ -551,8 +549,8 @@ try:
     @bot.message_handler(commands=["my_tg"])
     @ignoring_not_admin_message
     @logger.catch
-    def getter_my_tg(message):
-        tg_list = get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
+    async def getter_my_tg(message):
+        tg_list = [[el[1]] for el in await TgChannelTable.select_channel()]
         message_text = "Ваши каналы:\n"
 
         for tg in tg_list:
@@ -573,9 +571,9 @@ try:
     def delete_tg_channel(message):
         tg = message.text[7:].strip() if len(message.text) > 7 else ""
 
-        mistake = delete_channel(tg)
-        if mistake is not None:
-            logger.info(mistake)
+        answer = TgChannelTable.delete_channel(tg=tg)
+        if answer != "success":
+            logger.info(answer)
             bot.send_message(message.chat.id, "что то пошло не так при удалении из бд")
         logger.info(f"использована функция пользователем c id {message.chat.id}")
         bot.send_message(message.chat.id, "канал удален")
@@ -614,7 +612,7 @@ try:
 
 
     @logger.catch
-    def save_submit(call):
+    async def save_submit(call):
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons, date_adv
 
         inf_adv = (f"{text_adv if text_adv else '-'}"
@@ -636,20 +634,20 @@ try:
             logger.info("не выбрано ни одного паблика в функции save_submit")
             return
 
-        new_adv_inf(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
+        await AdvTable.insert_adv(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
         delete_submit_message(call.message, check_exist_media=check_exist_media)
         bot.send_message(call.message.chat.id, "реклама сохранена")
         logger.info(f"использована функция пользователем c id {call.message.chat.id}")
         return
 
 
-    def del_adv() -> list:
-        all_adv = get_db_inf(name_table=name_tbl_adv)
+    async def del_adv() -> list:
+        all_adv = await AdvTable.select_adv()
         ready_adv = []
         for el in all_adv:
             if time_difference(el[2]) == -1:
                 ready_adv.append(el)
-                delete_adv_inf(el[0])
+                await AdvTable.delete_adv(el[0])
         return ready_adv
 
 
@@ -806,7 +804,7 @@ try:
 
     @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
-    def adv_newsletter(message) -> None:
+    async def adv_newsletter(message) -> None:
         global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, \
             photo_adv, video_adv
 
@@ -834,8 +832,9 @@ try:
             my_group_for_keyboard = []
             status_buttons = {}
             text_adv = formation(date_adv_text[1])
+            tg_db_channel = [[el[1]] for el in await TgChannelTable.select_channel()]
             tg_channel = set([
-                el[0] for el in get_db_inf(name_col="tg_channel", name_table=name_tbl_channel)
+                el[0] for el in tg_db_channel
             ])
 
             for tg in tg_channel:
@@ -850,7 +849,7 @@ try:
             message_text = "Выберите каналы, в которые должна пойти рассылка"
             bot.send_message(message.chat.id, message_text, reply_markup=markup)
 
-            logger.info(f"использованна функция пользователем c id {message.chat.id}")
+            logger.info(f"использована функция пользователем c id {message.chat.id}")
 
         except Exception as ex:
             logger.error(f"{ex} (error)!")
