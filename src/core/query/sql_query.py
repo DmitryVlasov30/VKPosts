@@ -25,14 +25,26 @@ async def clear_inf(counts_post: int):
             clear_posts_id = posts_id[-counts_post:]
 
             quantity = len(clear_posts_id)
-            query = (
-                select(VkTgChannel)
-                .filter(VkTgChannel.id == int(element[0]))
-            )
-            db_el = await session.execute(query)
-            db_el = db_el.all()
+            element[4] = " ".join(clear_posts_id)
+            element[5] = str(quantity)
 
-        return posts
+            del_el = delete(VkTgChannel).filter(VkTgChannel.id == int(element[0]))
+            await session.execute(del_el)
+
+            data = [{
+                "id": element[0],
+                "vk_id": element[1],
+                "vk_screen": element[2],
+                "tg_channel": element[3],
+                "posts_id": element[4],
+                "quantity": element[5],
+            }]
+
+            await session.execute(insert(VkTgChannel).values(data))
+
+        await session.commit()
+
+    return "success"
 
 
 async def new_tg_vk(vk_id: int,
@@ -145,3 +157,4 @@ async def select_channel():
 
         result = await session.execute(query)
         return result.all()
+
