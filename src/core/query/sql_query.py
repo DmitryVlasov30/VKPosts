@@ -6,7 +6,11 @@ from src.core.models.base import Base
 
 
 def create_table():
-    Base.metadata.create_all(db_helper.engine)
+    Base.metadata.create_all(db_helper.engin)
+
+
+def drop_table():
+    Base.metadata.drop_all(db_helper.engin)
 
 
 class VkTgTable:
@@ -173,3 +177,5 @@ class TgChannelTable:
             session.commit()
 
         return "success"
+
+

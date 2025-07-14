@@ -1,3 +1,5 @@
+import time
+
 from src.filter_adv import filter_add, filter_photo, replace_warning_word
 from src.format_adv_text import formation
 from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
@@ -9,7 +11,7 @@ from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardB
 from json import load
 from traceback import format_exc
 from datetime import datetime
-from threading import Timer, current_thread, main_thread
+from threading import Timer, current_thread, main_thread, Thread
 from pathlib import Path
 
 from loguru import logger
@@ -218,7 +220,8 @@ try:
                         '<em><u><i>Created by Vlasov</i></u></em>')
         bot.send_message(message.chat.id, text_message, parse_mode='html')
 
-        start_timer(message)
+        thread = Thread(target=start_timer, daemon=True, args=(message,))
+        thread.start()
         create_table()
         logger.info("была использована функция main")
 
@@ -226,8 +229,10 @@ try:
     if not flag_stop:
         @logger.catch
         def start_timer(message):
-            global INTERVAL
-            Timer(INTERVAL, message_post, args=(message,)).start()
+            while True:
+                time.sleep(INTERVAL)
+                logger.debug("test")
+                message_post(message)
 
 
     @bot.message_handler(commands=["add"])
@@ -280,6 +285,7 @@ try:
             if '@' in tg:
                 tg = tg.replace('@', '')
 
+            logger.debug(all_inf)
             flag_exists = False
             for vk_db, tg_db in all_inf:
                 if vk_db == vk and tg_db == tg:
@@ -372,7 +378,6 @@ try:
                 logger.info(flag)
                 ready_adv = del_adv()
                 send_adv_posts(ready_adv)
-                start_timer(message)
                 return
 
 
@@ -381,7 +386,7 @@ try:
     @logger.catch
     def get_group_list(message) -> None:
         all_inf = [[el[2], el[3], el[1]] for el in VkTgTable.select_tg_vk()]
-
+        logger.debug(all_inf)
         if len(all_inf) == 0:
             bot.send_message(message.chat.id, "У вас нет групп")
             return
