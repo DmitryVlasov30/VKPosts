@@ -1,15 +1,16 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from src.core.config import settings
 
 
 class DataBaseHelper:
     def __init__(self, url: str, echo: bool = False):
-        self.engin = create_async_engine(
+        self.engin = create_engine(
             url=url,
             echo=echo,
         )
-        self.session_factory = async_sessionmaker(
+        self.session_factory = sessionmaker(
             bind=self.engin,
             autoflush=False,
             autocommit=False,
