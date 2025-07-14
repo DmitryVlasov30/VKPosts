@@ -235,20 +235,27 @@ try:
                 message_post(message)
 
 
+    def processing_input_data(text: str):
+        vk, tg = text[4:].strip().split()
+        if 'https://vk.com' in vk:
+            vk = vk.split('/')[-1]
+
+        if 'https://t.me' in tg:
+            tg = tg.split('/')[-1]
+
+        if '@' in tg:
+            tg = tg.replace('@', '')
+
+        return vk, tg
+
+
     @bot.message_handler(commands=["add"])
     @ignoring_not_admin_message
     def add_vk_tg_group(message) -> None:
         chat = message.chat.id
         try:
-            vk, tg = message.text[4:].strip().split()
-            if 'https://vk.com' in vk:
-                vk = vk.split('/')[-1]
+            vk, tg = processing_input_data(message.text)
 
-            if 'https://t.me' in tg:
-                tg = tg.split('/')[-1]
-
-            if '@' in tg:
-                tg = tg.replace('@', '')
             inf_exist = check_exist_groups(vk, tg)
             if inf_exist != "-" and inf_exist != "":
                 bot.send_message(chat, inf_exist)
@@ -274,16 +281,7 @@ try:
         try:
             all_inf = [[el[2], el[3]] for el in VkTgTable.select_tg_vk()]
 
-            vk, tg = message.text[4:].strip().split()
-
-            if 'https://vk.com' in vk:
-                vk = vk.split('/')[-1]
-
-            if 'https://t.me' in tg:
-                tg = tg.split('/')[-1]
-
-            if '@' in tg:
-                tg = tg.replace('@', '')
+            vk, tg = processing_input_data(message.text)
 
             logger.debug(all_inf)
             flag_exists = False
