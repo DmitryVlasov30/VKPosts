@@ -1,34 +1,23 @@
-import time
-
-from src.filter_adv import filter_add, filter_photo, replace_warning_word
-from src.format_adv_text import formation
+from src.utils import FilterAdv, AdvFormat
 from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
+from config import settings
 
 import vk_api.exceptions
+import time
 from vk_api import VkApi
 from telebot import TeleBot
 from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaVideo
-from json import load
 from traceback import format_exc
 from datetime import datetime
-from threading import Timer, current_thread, main_thread, Thread
-from pathlib import Path
+from threading import current_thread, main_thread, Thread
 
 from loguru import logger
 
-with open("../data.json") as data:
-    inf = load(data)
-    ACCESS_TOKEN_VK = inf["access_token_vk"]
-    TOKEN = inf["token"]
-    GENERAL_ADMIN = inf["general_admin"]
-    ADMIN_CHAT_ID = inf["moderators"]
-    LOG_PATH = Path(inf["path_to_logs"])
-    INTERVAL = inf["interval"]
+logger.add(settings.path_to_logs, level="DEBUG")
 
-logger.add(LOG_PATH, level="DEBUG")
-
-bot = TeleBot(token=TOKEN)
-ADMIN_CHAT_ID.append(GENERAL_ADMIN)
+bot = TeleBot(token=settings.token_tg)
+ADMIN_CHAT_ID = settings.moderators
+ADMIN_CHAT_ID.append(settings.general_admin)
 flag_stop = False
 my_keyboard = []
 my_group_for_keyboard = []
@@ -43,12 +32,10 @@ try:
 
     @logger.catch
     def check_exist_groups(vk, tg) -> str:
-        global ACCESS_TOKEN_VK
-
         flag_vk = False if vk != "-" else "-"
         flag_tg = False if tg != "-" else "-"
         if vk != "-":
-            vk_session = vk_api.VkApi(token=ACCESS_TOKEN_VK).get_api()
+            vk_session = vk_api.VkApi(token=settings.access_token_vk).get_api()
             try:
                 vk_session.groups.getById(group_id=vk)
                 flag_vk = True
@@ -84,9 +71,8 @@ try:
 
 
     def group_all_information(group_name, information=None):
-        global ACCESS_TOKEN_VK
         try:
-            vk = vk_api.VkApi(token=ACCESS_TOKEN_VK)
+            vk = vk_api.VkApi(token=settings.access_token_vk)
             response = vk.method('groups.getById', {'group_ids': group_name})
             match information:
                 case 'id':
@@ -121,7 +107,6 @@ try:
 
     def ignoring_not_admin_message(func):
         def wrapper(message):
-            global ADMIN_CHAT_ID
             if not str(message.chat.id) in ADMIN_CHAT_ID:
                 return
             function = func(message)
@@ -145,7 +130,6 @@ try:
     @ignoring_not_admin_message
     @logger.catch
     def adm_list(message) -> None:
-        global ADMIN_CHAT_ID
         inf_user = ''
         for el in ADMIN_CHAT_ID:
             chat = bot.get_chat(int(el))
@@ -155,8 +139,7 @@ try:
 
 
     def post_information(group_id: int, group_tg: str):
-        global ACCESS_TOKEN_VK
-        vk = VkApi(token=ACCESS_TOKEN_VK)
+        vk = VkApi(token=settings.access_token_vk)
         post_inf = []
         all_message = VkTgTable.select_tg_vk()
         all_message = [[el[1], el[3], el[4]] for el in all_message]
@@ -214,7 +197,6 @@ try:
     @bot.message_handler(commands=["start"])
     @logger.catch
     def main(message) -> None:
-        global LOG_PATH
         text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
                         'Используйте команду /help для вызова списка функций\n\n'
                         '<em><u><i>Created by Vlasov</i></u></em>')
@@ -230,7 +212,7 @@ try:
         @logger.catch
         def start_timer(message):
             while True:
-                time.sleep(INTERVAL)
+                time.sleep(settings.interval)
                 logger.debug("test")
                 message_post(message)
 
@@ -308,7 +290,6 @@ try:
     if not flag_stop:
         @logger.catch
         def message_post(message):
-            global ADMIN_CHAT_ID
 
             try:
                 group_inf = [[el[2], el[3], el[1]] for el in VkTgTable.select_tg_vk()]
@@ -328,10 +309,10 @@ try:
                     count_id = 0
                     for text_post, photo_post in new_posts:
                         try:
-                            if filter_photo(vk):
+                            if FilterAdv.filter_photo(vk):
                                 photo_post = []
 
-                            text_post = replace_warning_word(text_post, tg)
+                            text_post = FilterAdv.replace_warning_word(text_post, tg)
                             logger.info(text_post if text_post != "" else "текст не найден")
 
                             if text_post == '' and len(photo_post) > 1:
@@ -339,7 +320,7 @@ try:
                                 bot.send_media_group(chat_id=f'@{tg}', media=media)
                             elif len(photo_post) == 1 and text_post == '':
                                 bot.send_photo(f'@{tg}', photo=photo_post[0])
-                            elif text_post != '' and len(photo_post) > 1 and filter_add(text_post):
+                            elif text_post != '' and len(photo_post) > 1 and FilterAdv.filter_add(text_post):
                                 media = []
                                 for i, url in enumerate(photo_post):
                                     if i == 0:
@@ -347,9 +328,9 @@ try:
                                         continue
                                     media.append(InputMediaPhoto(media=url))
                                 bot.send_media_group(chat_id=f'@{tg}', media=media)
-                            elif text_post != '' and len(photo_post) == 1 and filter_add(text_post):
+                            elif text_post != '' and len(photo_post) == 1 and FilterAdv.filter_add(text_post):
                                 bot.send_photo(f'@{tg}', photo_post[0], caption=text_post)
-                            elif len(photo_post) == 0 and text_post != '' and filter_add(text_post):
+                            elif len(photo_post) == 0 and text_post != '' and FilterAdv.filter_add(text_post):
                                 bot.send_message(f'@{tg}', text_post)
                             elif len(photo_post) == 0 and text_post == '':
                                 continue
@@ -438,7 +419,7 @@ try:
     @ignoring_not_admin_message
     @logger.catch
     def stop_bot(message) -> None:
-        global ADMIN_CHAT_ID, flag_stop
+        global flag_stop
         for el in ADMIN_CHAT_ID:
             bot.send_message(el, 'Работа бота завершена')
         flag_stop = True
@@ -834,7 +815,7 @@ try:
             my_keyboard = []
             my_group_for_keyboard = []
             status_buttons = {}
-            text_adv = formation(date_adv_text[1])
+            text_adv = AdvFormat.formation(date_adv_text[1])
             tg_db_channel = [[el[1]] for el in TgChannelTable.select_channel()]
             tg_channel = set([
                 el[0] for el in tg_db_channel
