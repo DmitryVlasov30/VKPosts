@@ -410,11 +410,6 @@ try:
         logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
-    @bot.message_handler(commands=["my_id"])
-    def my_id(message) -> None:
-        bot.send_message(message.chat.id, f'Ваш id: `{str(message.chat.id)}`', parse_mode='Markdown')
-
-
     @bot.message_handler(commands=["stop"])
     @ignoring_not_admin_message
     @logger.catch
@@ -452,6 +447,11 @@ try:
                     f"<b>каналы куда пойдет рассылка</b>: \n{' '.join(el[3].split('/'))}\n")
             bot.send_message(message.chat.id, text, parse_mode='html')
             logger.info(f"использована функция пользователем c id {message.chat.id}")
+
+
+    @bot.message_handler(commands=["my_id"])
+    def my_id(message) -> None:
+        bot.send_message(message.chat.id, f'Ваш id: `{str(message.chat.id)}`', parse_mode='Markdown')
 
 
     @bot.message_handler(commands=["delete"])
