@@ -69,7 +69,7 @@ class FilterAdv:
 
     @staticmethod
     def replace_warning_word(text_post: str, tg: str):
-        replace_word = settings.replace_word
+        replace_word = settings.replace_words
         for word in replace_word:
             text_post = text_post.replace(word, "")
         return text_post
