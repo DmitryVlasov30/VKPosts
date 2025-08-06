@@ -1,14 +1,14 @@
-from src.utils import FilterAdv, AdvFormat, Checker, ignoring_not_admin_message
+from src.utils import FilterAdv, AdvFormat, Helper, ignoring_not_admin_message
 from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
 from vk_api_req.request import VkApiRequest
 from config import settings
 
 import time
 from telebot import TeleBot
+from telebot.types import Message, CallbackQuery
 from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaVideo
 from traceback import format_exc
-from datetime import datetime
-from threading import current_thread, main_thread, Thread
+from threading import Thread
 
 from loguru import logger
 
@@ -47,7 +47,7 @@ try:
     @bot.message_handler(commands=["list_adm"])
     @ignoring_not_admin_message
     @logger.catch
-    def adm_list(message) -> None:
+    def adm_list(message: Message) -> None:
         inf_user = ''
         for el in ADMIN_CHAT_ID:
             chat = bot.get_chat(int(el))
@@ -72,35 +72,21 @@ try:
 
     if not flag_stop:
         @logger.catch
-        def start_timer(message):
+        def start_timer(message: Message) -> None:
             while True:
                 time.sleep(settings.interval)
                 logger.debug("test")
                 message_post(message)
 
 
-    def processing_input_data(text: str):
-        vk, tg = text[4:].strip().split()
-        if 'https://vk.com' in vk:
-            vk = vk.split('/')[-1]
-
-        if 'https://t.me' in tg:
-            tg = tg.split('/')[-1]
-
-        if '@' in tg:
-            tg = tg.replace('@', '')
-
-        return vk, tg
-
-
     @bot.message_handler(commands=["add"])
     @ignoring_not_admin_message
-    def add_vk_tg_group(message) -> None:
+    def add_vk_tg_group(message: Message) -> None:
         chat = message.chat.id
         try:
-            vk, tg = processing_input_data(message.text)
+            vk, tg = Helper.processing_input_data(message.text)
 
-            checker = Checker(bot)
+            checker = Helper(bot)
             inf_exist = checker.check_exist_groups(vk, tg)
             if inf_exist != "-" and inf_exist != "":
                 bot.send_message(chat, inf_exist)
@@ -121,12 +107,12 @@ try:
 
     @bot.message_handler(commands=['del'])
     @ignoring_not_admin_message
-    def del_group(message) -> None:
+    def del_group(message: Message) -> None:
         chat = message.chat.id
         try:
             all_inf = [[el[2], el[3]] for el in VkTgTable.select_tg_vk()]
 
-            vk, tg = processing_input_data(message.text)
+            vk, tg = Helper.processing_input_data(message.text)
 
             logger.debug(all_inf)
             flag_exists = False
@@ -152,8 +138,7 @@ try:
 
     if not flag_stop:
         @logger.catch
-        def message_post(message):
-
+        def message_post(message: Message):
             try:
                 group_inf = [[el[2], el[3], el[1]] for el in VkTgTable.select_tg_vk()]
 
@@ -175,7 +160,7 @@ try:
                             if FilterAdv.filter_photo(vk):
                                 photo_post = []
 
-                            text_post = FilterAdv.replace_warning_word(text_post, tg)
+                            text_post = FilterAdv.replace_warning_word(text_post)
                             logger.info(text_post if text_post != "" else "текст не найден")
 
                             if text_post == '' and len(photo_post) > 1:
@@ -226,7 +211,7 @@ try:
     @bot.message_handler(commands=["group"])
     @ignoring_not_admin_message
     @logger.catch
-    def get_group_list(message) -> None:
+    def get_group_list(message: Message) -> None:
         all_inf = [[el[2], el[3], el[1]] for el in VkTgTable.select_tg_vk()]
         logger.debug(all_inf)
         if len(all_inf) == 0:
@@ -247,7 +232,7 @@ try:
     @bot.message_handler(commands=['help'])
     @ignoring_not_admin_message
     @logger.catch
-    def help_func(message) -> None:
+    def help_func(message: Message) -> None:
         message_text = ('/start -> перезапускает интервал проверки постов из ВК и выводит начальную информацию\n'
                         '/add("ссылка на паблик в вк" "username вашего тг канала") -> добавляет канал и тг для '
                         'пересылки постов\n'
@@ -276,7 +261,7 @@ try:
     @bot.message_handler(commands=["stop"])
     @ignoring_not_admin_message
     @logger.catch
-    def stop_bot(message) -> None:
+    def stop_bot(message: Message) -> None:
         global flag_stop
         for el in ADMIN_CHAT_ID:
             bot.send_message(el, 'Работа бота завершена')
@@ -289,7 +274,7 @@ try:
     @bot.message_handler(commands=["my_adv"])
     @ignoring_not_admin_message
     @logger.catch
-    def get_adv_inf(message):
+    def get_adv_inf(message: Message):
         all_inf = AdvTable.select_adv()
         if not len(all_inf):
             bot.send_message(message.chat.id, "У вас нет рекламы")
@@ -313,14 +298,14 @@ try:
 
 
     @bot.message_handler(commands=["my_id"])
-    def my_id(message) -> None:
+    def my_id(message: Message) -> None:
         bot.send_message(message.chat.id, f'Ваш id: `{str(message.chat.id)}`', parse_mode='Markdown')
 
 
     @bot.message_handler(commands=["delete"])
     @ignoring_not_admin_message
     @logger.catch
-    def reset_all_data(message):
+    def reset_all_data(message: Message):
         if len(message.text) == 7:
             bot.send_message(message.chat.id, "использована функция без указаний")
             logger.info(f"функция delete без аргументов пользователем c id {message.chat.id}")
@@ -347,7 +332,7 @@ try:
 
     @bot.message_handler(commands=["reset"])
     @logger.catch
-    def reset_adv_inf(message, local_use=True) -> None:
+    def reset_adv_inf(message: Message, local_use: bool = True) -> None:
         global my_keyboard, my_group_for_keyboard, status_buttons, inf_adv, text_adv, photo_adv, video_adv, date_adv, \
             message_id_adv
         my_keyboard = []
@@ -367,16 +352,10 @@ try:
     @bot.message_handler(commands=["tg"])
     @ignoring_not_admin_message
     @logger.catch
-    def update_tg(message):
-        tg = message.text[3:].strip() if len(message.text) > 3 else ""
+    def update_tg(message: Message) -> None:
+        tg = Helper.processing_input_data(message.text, only_tg=True)
 
-        if 'https://t.me' in tg:
-            tg = tg.split('/')[-1]
-
-        if '@' in tg:
-            tg = tg.replace('@', '')
-
-        checker = Checker(bot)
+        checker = Helper(bot)
         if not checker.check_exist_groups(tg=tg, vk="-"):
             bot.send_message(message.chat.id, "ТГ канала не существует")
             logger.info("ТГ канала не существует")
@@ -397,7 +376,7 @@ try:
     @bot.message_handler(commands=["my_tg"])
     @ignoring_not_admin_message
     @logger.catch
-    def getter_my_tg(message):
+    def getter_my_tg(message: Message) -> None:
         tg_list = [[el[1]] for el in TgChannelTable.select_channel()]
         message_text = "Ваши каналы:\n"
 
@@ -416,7 +395,7 @@ try:
     @bot.message_handler(commands=["del_tg"])
     @ignoring_not_admin_message
     @logger.catch
-    def delete_tg_channel(message):
+    def delete_tg_channel(message: Message) -> None:
         tg = message.text[7:].strip() if len(message.text) > 7 else ""
 
         answer = TgChannelTable.delete_channel(tg=tg)
@@ -428,7 +407,7 @@ try:
 
 
     @logger.catch
-    def change_submit(call) -> None:
+    def change_submit(call: CallbackQuery) -> None:
         global my_keyboard, my_group_for_keyboard
 
         call_data = call.data.split()
@@ -452,7 +431,7 @@ try:
         logger.info(f"использована функция пользователем c id {call.message.chat.id}")
 
 
-    def delete_submit_message(message, check_exist_media=False):
+    def delete_submit_message(message: Message, check_exist_media=False):
         bot.delete_message(message.chat.id, message.id)
         bot.delete_message(message.chat.id, message.id - 1)
         if check_exist_media:
@@ -460,7 +439,7 @@ try:
 
 
     @logger.catch
-    def save_submit(call):
+    def save_submit(call: CallbackQuery) -> None:
         global my_keyboard, my_group_for_keyboard, inf_adv, photo_adv, video_adv, text_adv, status_buttons, date_adv
 
         inf_adv = (f"{text_adv if text_adv else '-'}"
@@ -493,7 +472,7 @@ try:
         all_adv = AdvTable.select_adv()
         ready_adv = []
         for el in all_adv:
-            if time_difference(el[2]) == -1:
+            if Helper.time_difference(el[2]) == -1:
                 ready_adv.append(el)
                 AdvTable.delete_adv(el[0])
         return ready_adv
@@ -517,7 +496,7 @@ try:
 
     @bot.callback_query_handler(func=lambda call: True)
     @logger.catch
-    def callback(call):
+    def callback(call: CallbackQuery):
         match call.data.split()[-1]:
             case "add":
                 change_submit(call)
@@ -528,7 +507,7 @@ try:
 
 
     @logger.catch
-    def inf_post_adv(message) -> tuple:
+    def inf_post_adv(message: Message) -> tuple:
         message_text = message.text
         if message_text is None or message_text[:4].strip() != "/adv":
             return ()
@@ -552,33 +531,12 @@ try:
                 photo_adv.add(message.photo[-1].file_id)
 
 
-    @logger.catch
-    def time_difference(input_time):
-        try:
-            given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
-        except ValueError:
-            logger.info("Неверный формат времени")
-            return "Неверный формат времени. Используйте 'часы:минуты день.месяц.год'."
-        current_time = datetime.now()
-        current_time, given_time = given_time, current_time
-        if current_time >= given_time:
-            difference = current_time - given_time
-
-            days = difference.days
-            hours, remainder = divmod(difference.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
-            seconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60
-            return {
-                "days": days,
-                "hours": hours,
-                "minutes": minutes,
-                "seconds_diff": seconds,
-            }
-        else:
-            return -1
-
-
-    def send_adv_message_submit(chat_id, photo="-", video="-", text="-", local_func=False):
+    def send_adv_message_submit(chat_id,
+                                photo: str = "-",
+                                video: str = "-",
+                                text: str = "-",
+                                local_func: bool = False
+                                ) -> None:
         global photo_adv, video_adv, text_adv
         try:
             if not local_func:
@@ -652,7 +610,7 @@ try:
 
     @bot.message_handler(content_types=["text"])
     @ignoring_not_admin_message
-    def adv_newsletter(message) -> None:
+    def adv_newsletter(message: Message) -> None:
         global my_keyboard, my_group_for_keyboard, status_buttons, text_adv, date_adv, message_id_adv, \
             photo_adv, video_adv
 
@@ -662,7 +620,7 @@ try:
             logger.info("введен неизвестный текст в функции adv_newsletter")
             return
 
-        date = time_difference(date_adv_text[0])
+        date = Helper.time_difference(date_adv_text[0])
         date_adv = date_adv_text[0]
         if not type(date) is dict:
             reset_adv_inf(message, local_use=False)

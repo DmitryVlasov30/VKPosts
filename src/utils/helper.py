@@ -143,6 +143,31 @@ class Helper:
                 tg = Helper.update_tg(tg)
                 return vk, tg
 
+    @staticmethod
+    @logger.catch
+    def time_difference(input_time):
+        try:
+            given_time = datetime.strptime(input_time, "%H:%M %d.%m.%Y")
+        except ValueError:
+            logger.info("Неверный формат времени")
+            return "Неверный формат времени. Используйте 'часы:минуты день.месяц.год'."
+        current_time = datetime.now()
+        current_time, given_time = given_time, current_time
+        if current_time >= given_time:
+            difference = current_time - given_time
+
+            days = difference.days
+            hours, remainder = divmod(difference.seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
+            seconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60
+            return {
+                "days": days,
+                "hours": hours,
+                "minutes": minutes,
+                "seconds_diff": seconds,
+            }
+        else:
+            return -1
 
 
 def ignoring_not_admin_message(func):
