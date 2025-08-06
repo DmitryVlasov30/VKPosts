@@ -1,4 +1,4 @@
-from src.utils import FilterAdv, AdvFormat, Checker
+from src.utils import FilterAdv, AdvFormat, Checker, ignoring_not_admin_message
 from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
 from vk_api_req.request import VkApiRequest
 from config import settings
@@ -42,27 +42,6 @@ try:
         if not flag_exist:
             VkTgTable.insert_tg_vk(vk_id=int(id_group), vk_screen=vk, tg_channel=tg)
         return flag_exist
-
-
-    def ignoring_not_admin_message(func):
-        def wrapper(message):
-            if not str(message.chat.id) in ADMIN_CHAT_ID:
-                return
-            function = func(message)
-            return function
-
-        return wrapper
-
-
-    def main_thread_only(func):
-        def wrapper(*args, **kwargs):
-            if current_thread() is main_thread():
-                return func(*args, **kwargs)
-            else:
-                logger.error("Function can only be executed in the main thread.")
-                raise RuntimeError("Function can only be executed in the main thread.")
-
-        return wrapper
 
 
     @bot.message_handler(commands=["list_adm"])

@@ -2,6 +2,7 @@ from loguru import logger
 from src.config import settings
 from vk_api.exceptions import ApiError
 from vk_api import VkApi
+from threading import current_thread, main_thread
 
 
 class AdvFormat:
@@ -118,3 +119,25 @@ class Checker:
             return inf_text
         return ""
 
+
+def ignoring_not_admin_message(func):
+    def wrapper(message):
+        admins = settings.moderators
+        admins.append(settings.general_admin)
+        if not str(message.chat.id) in admins:
+            return
+        function = func(message)
+        return function
+
+    return wrapper
+
+
+def main_thread_only(func):
+    def wrapper(*args, **kwargs):
+        if current_thread() is main_thread():
+            return func(*args, **kwargs)
+        else:
+            logger.error("Function can only be executed in the main thread.")
+            raise RuntimeError("Function can only be executed in the main thread.")
+
+    return wrapper
