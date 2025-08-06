@@ -3,6 +3,7 @@ from src.config import settings
 from vk_api.exceptions import ApiError
 from vk_api import VkApi
 from threading import current_thread, main_thread
+from datetime import datetime
 
 
 class AdvFormat:
@@ -69,14 +70,14 @@ class FilterAdv:
         return True
 
     @staticmethod
-    def replace_warning_word(text_post: str, tg: str):
+    def replace_warning_word(text_post: str):
         replace_word = settings.replace_words
         for word in replace_word:
             text_post = text_post.replace(word, "")
         return text_post
 
 
-class Checker:
+class Helper:
     def __init__(self, bot):
         self.bot = bot
 
@@ -118,6 +119,30 @@ class Checker:
         if inf_text != "-":
             return inf_text
         return ""
+
+    @staticmethod
+    def update_tg(tg: str) -> str:
+        if 'https://t.me' in tg:
+            tg = tg.split('/')[-1]
+
+        if '@' in tg:
+            tg = tg.replace('@', '')
+        return tg
+
+    @staticmethod
+    def processing_input_data(text: str, only_tg: bool = False) -> str | tuple[str, str]:
+        match only_tg:
+            case True:
+                tg = text[3:].strip() if len(text) > 3 else ""
+                return Helper.update_tg(tg)
+            case _:
+                vk, tg = text[4:].strip().split()
+                if 'https://vk.com' in vk:
+                    vk = vk.split('/')[-1]
+
+                tg = Helper.update_tg(tg)
+                return vk, tg
+
 
 
 def ignoring_not_admin_message(func):
