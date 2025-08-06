@@ -1,10 +1,9 @@
-from src.utils import FilterAdv, AdvFormat
+from src.utils import FilterAdv, AdvFormat, Checker
 from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
+from vk_api_req.request import VkApiRequest
 from config import settings
 
-import vk_api.exceptions
 import time
-from vk_api import VkApi
 from telebot import TeleBot
 from telebot.types import InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaVideo
 from traceback import format_exc
@@ -29,69 +28,9 @@ date_adv = ""
 message_id_adv = ""
 
 try:
-
-    @logger.catch
-    def check_exist_groups(vk, tg) -> str:
-        flag_vk = False if vk != "-" else "-"
-        flag_tg = False if tg != "-" else "-"
-        if vk != "-":
-            vk_session = vk_api.VkApi(token=settings.access_token_vk).get_api()
-            try:
-                vk_session.groups.getById(group_id=vk)
-                flag_vk = True
-            except vk_api.exceptions.ApiError as ex:
-                if ex.code == 100:
-                    flag_vk = False
-        if tg != "-":
-            try:
-                bot.get_chat(f'@{tg}')
-                flag_tg = True
-            except Exception as ex:
-                if 'Chat not found' in str(ex):
-                    flag_tg = False
-        ans = (flag_vk, flag_tg)
-
-        if flag_vk == "-":
-            return flag_tg
-        if flag_tg == "-":
-            return flag_tg
-
-        match ans:
-            case (True, False):
-                inf_text = "Группы ТГ не существует"
-            case (False, False):
-                inf_text = "Группы ВК и ТГ не существует"
-            case (False, True):
-                inf_text = "Группы ВК не существует"
-            case _:
-                inf_text = "-"
-        if inf_text != "-":
-            return inf_text
-        return ""
-
-
-    def group_all_information(group_name, information=None):
-        try:
-            vk = vk_api.VkApi(token=settings.access_token_vk)
-            response = vk.method('groups.getById', {'group_ids': group_name})
-            match information:
-                case 'id':
-                    return str(response[0].get('id', None))
-                case 'name':
-                    return response[0].get('name', None)
-                case 'link':
-                    return f'https://vk.com/{response[0].get("screen_name", None)}'
-                case 'screen_name':
-                    return response[0].get('screen_name', group_name)
-                case _:
-                    return response[0]
-        except Exception as ex:
-            logger.error(f"function: group all information ---- {ex}")
-
-
     @logger.catch
     def add_inf_message(vk, tg):
-        id_group = group_all_information(vk, 'id')
+        id_group = VkApiRequest.group_all_information(vk, 'id')
 
         if id_group is None:
             return False
@@ -138,62 +77,6 @@ try:
         bot.send_message(message.chat.id, inf_user, parse_mode='Markdown')
 
 
-    def post_information(group_id: int, group_tg: str):
-        vk = VkApi(token=settings.access_token_vk)
-        post_inf = []
-        all_message = VkTgTable.select_tg_vk()
-        all_message = [[el[1], el[3], el[4]] for el in all_message]
-        all_message = [[[vk_id, tg], posts.split()] for vk_id, tg, posts in all_message]
-        log_posts = []
-        try:
-            response = vk.method('wall.get', {
-                'owner_id': -group_id,
-                'count': 5
-            })
-
-            posts = response['items']
-            if not len(all_message):
-                return
-            for post in posts:
-                if post.get('is_pinned', 0):
-                    continue
-                id_post = []
-                for el in all_message:
-                    if el[0][0] == group_id and el[0][1] == group_tg:
-                        id_post = el[1]
-                if not str(post.get('id', '')) in list(map(str, id_post)):
-                    logger.debug(f"post_get: {post.get('id', '')} post_now: {list(map(str, id_post))}")
-                    log_posts.extend(list(map(str, id_post)))
-                    log_posts.append(str(post.get("id", "")))
-                    for el in all_message:
-                        if el[0][0] == group_id and el[0][1] == group_tg:
-                            el[1].append(str(post.get('id')))
-                            lst = sorted(map(int, el[1]))
-                            posts = " ".join(list(map(str, lst)))
-                            VkTgTable.update_posts(vk_id=el[0][0], tg_channel=el[0][1], posts=posts)
-                    text_post = post.get('text', '')
-                    list_size_photo = []
-                    if 'attachments' in post:
-                        for attachments in post.get("attachments", []):
-                            if attachments['type'] == 'photo':
-                                for count, link in enumerate(attachments['photo']['sizes']):
-                                    if count == len(attachments['photo']['sizes']) - 1:
-                                        list_size_photo.append(link['url'])
-                    post_inf.append([text_post, list_size_photo])
-
-        except vk_api.exceptions.ApiError as ex:
-            logger.error(f"function: post_information --- {ex}")
-            pass
-
-        if list(post_inf):
-            logger.info(f"function: post_information"
-                        f"group tg: {group_tg},"
-                        f" thread: {current_thread().name}"
-                        f" group vk: {group_all_information(group_id, information='link')},"
-                        f"posts: {log_posts}")
-        return list(reversed(post_inf))
-
-
     @bot.message_handler(commands=["start"])
     @logger.catch
     def main(message) -> None:
@@ -238,12 +121,13 @@ try:
         try:
             vk, tg = processing_input_data(message.text)
 
-            inf_exist = check_exist_groups(vk, tg)
+            checker = Checker(bot)
+            inf_exist = checker.check_exist_groups(vk, tg)
             if inf_exist != "-" and inf_exist != "":
                 bot.send_message(chat, inf_exist)
                 return
 
-            vk = group_all_information(vk, 'screen_name')
+            vk = VkApiRequest.group_all_information(vk, 'screen_name')
             text = add_inf_message(vk, tg)
 
             if text:
@@ -274,7 +158,7 @@ try:
                 bot.send_message(chat, 'Группа не найдена')
                 return
 
-            vk = group_all_information(vk, "id")
+            vk = VkApiRequest.group_all_information(vk, "id")
             text_otv = VkTgTable.delete_tg_vk(vk, tg)
 
             if text_otv != "success":
@@ -299,7 +183,7 @@ try:
                     return
 
                 for vk, tg, id_group_vk in group_inf:
-                    new_posts = post_information(id_group_vk, tg)
+                    new_posts = VkApiRequest(5).post_information(id_group_vk, tg)
                     if new_posts is None:
                         for admin in ADMIN_CHAT_ID:
                             bot.send_message(admin, "функция post_information вернула None")
@@ -372,7 +256,7 @@ try:
 
         inf_group = 'Ваши группы:\n'
         for vk, tg, id_vk in all_inf:
-            vk_name = group_all_information(id_vk, 'screen_name')
+            vk_name = VkApiRequest.group_all_information(id_vk, 'screen_name')
             vk_link = f'https://vk.com/{vk_name}'
             inf_group += (f'*VK*: `{vk_name}`\n'
                           f'*TG*: `{tg}`\n'
@@ -513,7 +397,8 @@ try:
         if '@' in tg:
             tg = tg.replace('@', '')
 
-        if not check_exist_groups(tg=tg, vk="-"):
+        checker = Checker(bot)
+        if not checker.check_exist_groups(tg=tg, vk="-"):
             bot.send_message(message.chat.id, "ТГ канала не существует")
             logger.info("ТГ канала не существует")
             return
