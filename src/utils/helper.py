@@ -1,9 +1,10 @@
 from loguru import logger
 from src.config import settings
+from vk_api.exceptions import ApiError
+from vk_api import VkApi
 
 
 class AdvFormat:
-
     @staticmethod
     def format_link(text: str, link: str) -> str:
         return f'<a href="{link}">{text}</a>'
@@ -45,7 +46,6 @@ class AdvFormat:
 
 
 class FilterAdv:
-
     @staticmethod
     def filter_photo(vk) -> bool:
         filter_list = settings.photo_skip
@@ -73,3 +73,48 @@ class FilterAdv:
         for word in replace_word:
             text_post = text_post.replace(word, "")
         return text_post
+
+
+class Checker:
+    def __init__(self, bot):
+        self.bot = bot
+
+    @logger.catch
+    def check_exist_groups(self, vk, tg) -> str:
+        flag_vk = False if vk != "-" else "-"
+        flag_tg = False if tg != "-" else "-"
+        if vk != "-":
+            vk_session = VkApi(token=settings.access_token_vk).get_api()
+            try:
+                vk_session.groups.getById(group_id=vk)
+                flag_vk = True
+            except ApiError as ex:
+                if ex.code == 100:
+                    flag_vk = False
+        if tg != "-":
+            try:
+                self.bot.get_chat(f'@{tg}')
+                flag_tg = True
+            except Exception as ex:
+                if 'Chat not found' in str(ex):
+                    flag_tg = False
+        ans = (flag_vk, flag_tg)
+
+        if flag_vk == "-":
+            return flag_tg
+        if flag_tg == "-":
+            return flag_tg
+
+        match ans:
+            case (True, False):
+                inf_text = "Группы ТГ не существует"
+            case (False, False):
+                inf_text = "Группы ВК и ТГ не существует"
+            case (False, True):
+                inf_text = "Группы ВК не существует"
+            case _:
+                inf_text = "-"
+        if inf_text != "-":
+            return inf_text
+        return ""
+
