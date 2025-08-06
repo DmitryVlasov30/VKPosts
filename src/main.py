@@ -1,6 +1,7 @@
 from src.utils import FilterAdv, AdvFormat, Helper, ignoring_not_admin_message
 from src.core.query.sql_query import VkTgTable, AdvTable, TgChannelTable, create_table
 from vk_api_req.request import VkApiRequest
+from src.handlers import all_messages
 from config import settings
 
 import time
@@ -26,6 +27,7 @@ text_adv = ""
 photo_adv, video_adv = set(), set()
 date_adv = ""
 message_id_adv = ""
+language = "ru"
 
 try:
     @logger.catch
@@ -59,24 +61,19 @@ try:
     @bot.message_handler(commands=["start"])
     @logger.catch
     def main(message) -> None:
-        text_message = ('Вы запустили бота для сборки и пересылки информации из ВКонтакте в Телеграм\n'
-                        'Используйте команду /help для вызова списка функций\n\n'
-                        '<em><u><i>Created by Vlasov</i></u></em>')
-        bot.send_message(message.chat.id, text_message, parse_mode='html')
-
+        bot.send_message(message.chat.id, all_messages[language]["start"], parse_mode='html')
         thread = Thread(target=start_timer, daemon=True, args=(message,))
         thread.start()
         create_table()
         logger.info("была использована функция main")
 
 
-    if not flag_stop:
-        @logger.catch
-        def start_timer(message: Message) -> None:
-            while True:
-                time.sleep(settings.interval)
-                logger.debug("test")
-                message_post(message)
+    @logger.catch
+    def start_timer(message: Message) -> None:
+        while True:
+            time.sleep(settings.interval)
+            logger.debug("test")
+            message_post(message)
 
 
     @bot.message_handler(commands=["add"])
@@ -96,13 +93,13 @@ try:
             text = add_inf_message(vk, tg)
 
             if text:
-                bot.send_message(chat, 'Группa уже отслеживается')
+                bot.send_message(chat, text=all_messages[language]["add_vk_tg_group"]["exit_group"])
                 return
-            bot.send_message(chat, 'Группa отслеживается')
+            bot.send_message(chat, text=all_messages[language]["add_vk_tg_group"]["add_group"])
             logger.info(f"была успешно использована функция пользователем c id {chat}")
         except Exception as ex:
             logger.error(f'Произошла ошибка: {ex} в функции add_vk_tg_group')
-            bot.send_message(chat, f'Произошла ошибка: {ex} в функции add_vk_tg_group')
+            bot.send_message(chat, all_messages[language]["add_vk_tg_group"]["error"])
 
 
     @bot.message_handler(commands=['del'])
@@ -120,7 +117,7 @@ try:
                 if vk_db == vk and tg_db == tg:
                     flag_exists = True
             if not flag_exists:
-                bot.send_message(chat, 'Группа не найдена')
+                bot.send_message(chat, all_messages[language]["del_vk_tg_group"]["not_found_group"])
                 return
 
             vk = VkApiRequest.group_all_information(vk, "id")
@@ -129,11 +126,11 @@ try:
             if text_otv != "success":
                 bot.send_message(chat, text_otv)
                 return
-            bot.send_message(chat, 'Группа удалена')
+            bot.send_message(chat, all_messages[language]["del_vk_tg_group"]["delete_group"])
             logger.info(f"успешно использована функция пользователем c id {chat}")
         except Exception as ex:
             logger.error(f"Произошла ошибка: {ex} в функции del_group")
-            bot.send_message(chat, f'Произошла ошибка: {ex} в функции del_group')
+            bot.send_message(chat, all_messages[language]["del_vk_tg_group"]["error"])
 
 
     if not flag_stop:
@@ -233,28 +230,7 @@ try:
     @ignoring_not_admin_message
     @logger.catch
     def help_func(message: Message) -> None:
-        message_text = ('/start -> перезапускает интервал проверки постов из ВК и выводит начальную информацию\n'
-                        '/add("ссылка на паблик в вк" "username вашего тг канала") -> добавляет канал и тг для '
-                        'пересылки постов\n'
-                        '/del("название из ссылки на паблик в вк" "username вашего тг канала") -> удалит канал и тг '
-                        'для пересылки постов\n'
-                        '/group -> выводит список ваших тг и вк каналов\n'
-                        '/list_adm -> возвращает список админов\n'
-                        '/new_adm("chat id") -> добавляет админа в список\n'
-                        '/del_adm("chat id или username") -> удаляет админа\n'
-                        '/stop -> останавливает бота\n'
-                        '/my_id -> выводит ваш chat id\n'
-                        '/adv(дата рассылки в формате: /час:время день.месяц.год/, после написания даты, '
-                        'нужно указать текст рассылки, но до вызова функции нужно отправить видео и фото для '
-                        'рассылки) -> отправляет рекламу в указанное время\n'
-                        '/my_adv -> выводит список рекламных рассылок, которые вы добавили\n'
-                        '/delete(параметр: all - если вы хотите удалить все рекламные рассылки, id рекламной '
-                        'рассылки, можно получить в функции my_adv) -> удаляет рассылку\n'
-                        '/tg(username тг канала) -> обновляет тг канала в общую базу данных\n'
-                        '/del_tg(username тг канала) -> удаляет тг канал из общей базы\n'
-                        '/my_tg -> выводит все тг каналы в базе данных\n'
-                        '/reset -> отчищает промежуточную информацию о рекламной рассылке')
-        bot.send_message(message.chat.id, message_text)
+        bot.send_message(message.chat.id, all_messages[language]["help"])
         logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
@@ -264,7 +240,7 @@ try:
     def stop_bot(message: Message) -> None:
         global flag_stop
         for el in ADMIN_CHAT_ID:
-            bot.send_message(el, 'Работа бота завершена')
+            bot.send_message(el, all_messages[language]["stop"])
         flag_stop = True
         bot.stop_bot()
         logger.info(f"использована функция пользователем c id {message.chat.id}")
@@ -277,7 +253,7 @@ try:
     def get_adv_inf(message: Message):
         all_inf = AdvTable.select_adv()
         if not len(all_inf):
-            bot.send_message(message.chat.id, "У вас нет рекламы")
+            bot.send_message(message.chat.id, all_messages[language]["get_adv_inf"]["not_found_adv"])
             return
 
         for el in all_inf:
@@ -307,7 +283,7 @@ try:
     @logger.catch
     def reset_all_data(message: Message):
         if len(message.text) == 7:
-            bot.send_message(message.chat.id, "использована функция без указаний")
+            bot.send_message(message.chat.id, all_messages[language]["reset_all_data"]["not_instruction"])
             logger.info(f"функция delete без аргументов пользователем c id {message.chat.id}")
             return
 
@@ -315,7 +291,7 @@ try:
             case "all":
                 AdvTable.all_delete_adv()
                 logger.info("использована функция delete с аргументом all")
-                bot.send_message(message.chat.id, "реклама отчищена")
+                bot.send_message(message.chat.id, all_messages[language]["all_delete_adv"]["clear_all_adv"])
                 return
             case _:
                 argument = message.text[7:].lower().strip()
@@ -323,7 +299,7 @@ try:
                     id_col = [[el[0]] for el in AdvTable.select_adv()]
                     if int(argument) in [el[0] for el in id_col]:
                         AdvTable.delete_adv(int(argument))
-                        bot.send_message(message.chat.id, "реклама успешно удалена")
+                        bot.send_message(message.chat.id, all_messages[language]["all_delete_adv"]["clear_id_adv"])
                         logger.info("реклама удалена в функции delete")
                     else:
                         bot.send_message(message.chat.id, "реклама с таким id не найдена")
@@ -345,7 +321,7 @@ try:
         date_adv = ""
         message_id_adv = ""
         if local_use:
-            bot.send_message(message.chat.id, "вся информация про рекламу отчищена")
+            bot.send_message(message.chat.id, all_messages[language]["reset"])
         logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
@@ -357,19 +333,19 @@ try:
 
         checker = Helper(bot)
         if not checker.check_exist_groups(tg=tg, vk="-"):
-            bot.send_message(message.chat.id, "ТГ канала не существует")
+            bot.send_message(message.chat.id, all_messages[language]["tg"]["channel_not_exist"])
             logger.info("ТГ канала не существует")
             return
 
         all_inf = TgChannelTable.select_channel()
         for el in all_inf:
             if el[1] == tg:
-                bot.send_message(message.chat.id, "канал уже присутствует в бд")
+                bot.send_message(message.chat.id, all_messages[language]["tg"]["channel_exist"])
                 logger.info("канал уже присутствует в бд")
                 return
 
         TgChannelTable.insert_channel(tg_channel=tg)
-        bot.send_message(message.chat.id, "Канал добавлен ко всем в список")
+        bot.send_message(message.chat.id, all_messages[language]["tg"]["add_tg"])
         logger.info(f"использована функция пользователем c id {message.chat.id}")
 
 
@@ -384,7 +360,7 @@ try:
             message_text += f"`{tg[0]}`\n"
 
         if message_text.strip() == "Ваши каналы:":
-            bot.send_message(message.chat.id, "вы не добавили ни одного канала")
+            bot.send_message(message.chat.id, all_messages[language]["my_tg"])
             logger.info(f"использована функция пользователем c id {message.chat.id}")
             return
 
@@ -401,9 +377,9 @@ try:
         answer = TgChannelTable.delete_channel(tg=tg)
         if answer != "success":
             logger.info(answer)
-            bot.send_message(message.chat.id, "что то пошло не так при удалении из бд")
+            bot.send_message(message.chat.id, all_messages[language]["del_tg"]["error"])
         logger.info(f"использована функция пользователем c id {message.chat.id}")
-        bot.send_message(message.chat.id, "канал удален")
+        bot.send_message(message.chat.id, all_messages[language]["del_tg"]["delete"])
 
 
     @logger.catch
@@ -456,14 +432,13 @@ try:
         if not list_group:
             reset_adv_inf(call.message, local_use=False)
             delete_submit_message(call.message, check_exist_media=check_exist_media)
-            bot.send_message(call.message.chat.id,
-                             "вы не выбрали ни одного канала, информация о вашей рекламе отчищена")
+            bot.send_message(call.message.chat.id, all_messages[language]["save_submit"]["not_params"])
             logger.info("не выбрано ни одного паблика в функции save_submit")
             return
 
         AdvTable.insert_adv(inf_adv=inf_adv, date_post=date_adv, tg_vk_posting=list_group)
         delete_submit_message(call.message, check_exist_media=check_exist_media)
-        bot.send_message(call.message.chat.id, "реклама сохранена")
+        bot.send_message(call.message.chat.id, all_messages[language]["save_submit"]["save_adv"])
         logger.info(f"использована функция пользователем c id {call.message.chat.id}")
         return
 
@@ -616,7 +591,7 @@ try:
 
         date_adv_text = inf_post_adv(message)
         if not date_adv_text:
-            bot.send_message(message.chat.id, "вы ввели что-то не так")
+            bot.send_message(message.chat.id, all_messages[language]["adv_newsletter"]["error"])
             logger.info("введен неизвестный текст в функции adv_newsletter")
             return
 
@@ -626,7 +601,7 @@ try:
             reset_adv_inf(message, local_use=False)
             text = ""
             if type(date) is int:
-                text = "вы ввели дату, которая меньше нынешней"
+                text = all_messages[language]["adv_newsletter"]["time_not_correct"]
             if type(date) is str:
                 text = date
             bot.send_message(message.chat.id, text)
@@ -650,10 +625,9 @@ try:
 
             my_keyboard.append(InlineKeyboardButton("подтвердить", callback_data="end"))
             markup.add(*my_keyboard)
-            bot.send_message(message.chat.id, "вот ваше сообщение:")
+            bot.send_message(message.chat.id, all_messages[language]["adv_newsletter"]["get_message"])
             send_adv_message_submit(message.chat.id)
-            message_text = "Выберите каналы, в которые должна пойти рассылка"
-            bot.send_message(message.chat.id, message_text, reply_markup=markup)
+            bot.send_message(message.chat.id, all_messages[language]["adv_newsletter"]["inf_text"], reply_markup=markup)
 
             logger.info(f"использована функция пользователем c id {message.chat.id}")
 
@@ -665,6 +639,8 @@ try:
 except:
     logger.error(f"{format_exc()}")
 
-print('bot worked')
-bot.infinity_polling(timeout=10, long_polling_timeout=150)
-logger.info("бот остановлен")
+
+if __name__ == '__main__':
+    print('bot worked')
+    bot.infinity_polling(timeout=10, long_polling_timeout=150)
+    logger.info("бот остановлен")
