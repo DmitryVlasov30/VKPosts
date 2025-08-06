@@ -7,7 +7,7 @@ from threading import current_thread
 
 
 class VkApiRequest:
-    def __init(self, count):
+    def __init__(self, count):
         self.count = count
 
     def post_information(self, group_id: int, group_tg: str):
